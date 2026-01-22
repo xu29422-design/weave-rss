@@ -17,7 +17,6 @@ function getAIModel(settings: Settings) {
     const openai = createOpenAI({
       baseURL: settings.openaiBaseUrl?.trim().replace(/\/+$/, "") || "https://api.openai.com/v1",
       apiKey: settings.openaiApiKey,
-      compatibility: 'compatible', 
     });
     return {
       model: openai.chat(settings.openaiModel || "glm-4-flash"),
@@ -62,7 +61,7 @@ export async function analyzeItem(item: RawRSSItem, settings: Settings) {
       model,
       system: systemPrompt,
       prompt: `标题: ${item.title}\n内容: ${item.contentSnippet || "（内容为空）"}\n来源: ${item.sourceName}`,
-    }));
+    } as any));
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     const cleanedText = jsonMatch ? jsonMatch[0] : text;
@@ -114,7 +113,7 @@ export async function writeCategorySection(category: string, items: any[], setti
     model,
     system: systemPrompt,
     prompt: validItems.map(i => `- ${i.title}: ${i.summary} (URL: ${i.link})`).join("\n"),
-  });
+  } as any);
   return text;
 }
 
@@ -133,6 +132,6 @@ export async function generateTLDR(allSummaries: string, settings: Settings) {
     model,
     system: systemPrompt,
     prompt: allSummaries,
-  });
+  } as any);
   return text;
 }
