@@ -1,7 +1,7 @@
 "use server";
 
 import { createKVClient } from "@/lib/redis";
-import { google } from "@ai-sdk/google";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 
@@ -38,9 +38,10 @@ export async function testConfigs(formData: FormData) {
   // 2. 测试 AI
   try {
     if (aiProvider === 'google') {
-      const model = google("models/gemini-1.5-flash-latest", {
+      const googleProvider = createGoogleGenerativeAI({
         apiKey: geminiApiKey,
       });
+      const model = googleProvider("models/gemini-1.5-flash-latest");
       const { text } = await generateText({
         model,
         prompt: "hi",
