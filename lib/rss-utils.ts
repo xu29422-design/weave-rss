@@ -29,7 +29,7 @@ function cosineSimilarity(str1: string, str2: string): number {
   const grams1 = getNGrams(str1);
   const grams2 = getNGrams(str2);
   
-  const intersection = new Set([...grams1].filter(x => grams2.has(x)));
+  const intersection = new Set(Array.from(grams1).filter(x => grams2.has(x)));
   const union = grams1.size + grams2.size - intersection.size;
   
   return union === 0 ? 0 : intersection.size / Math.sqrt(grams1.size * grams2.size);
