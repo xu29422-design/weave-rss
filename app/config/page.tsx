@@ -28,8 +28,8 @@ const helpContent: any = {
     title: "定时推送设置",
     desc: "您可以自由设定每天接收简报的时间点。系统将按此时间准时送达。",
     steps: [
-      { t: "选择时间", d: "点击下方的小时按钮进行选择。" },
-      { t: "自动保存", d: "选择后系统会自动保存您的偏好。" },
+      { t: "选择时间点", d: "点击下方的小时按钮进行选择。" },
+      { t: "选择日期", d: "勾选您希望接收推送的星期。" },
       { t: "时区说明", d: "目前统一使用北京时间 (UTC+8)。" }
     ],
     link: "#",
@@ -175,7 +175,14 @@ export default function ConfigWizard() {
     setLoading(prev => ({ ...prev, [module]: true }));
     
     const formData = new FormData();
-    Object.entries(formState).forEach(([k, v]) => formData.append(k, v));
+    // 修复类型错误：将所有值转换为字符串
+    Object.entries(formState).forEach(([k, v]) => {
+      if (Array.isArray(v)) {
+        formData.append(k, JSON.stringify(v));
+      } else {
+        formData.append(k, String(v));
+      }
+    });
     formData.set("aiProvider", aiProvider); 
 
     try {
