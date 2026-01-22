@@ -38,10 +38,11 @@ export async function testConfigs(formData: FormData) {
   // 2. 测试 AI
   try {
     if (aiProvider === 'google') {
-      const model = google("models/gemini-1.5-flash-latest");
+      const model = google("models/gemini-1.5-flash-latest", {
+        apiKey: geminiApiKey,
+      });
       const { text } = await generateText({
         model,
-        apiKey: geminiApiKey,
         prompt: "hi",
       });
       if (text) results.ai = { status: "success", message: "Gemini 响应正常！" };
