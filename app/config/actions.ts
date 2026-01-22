@@ -30,7 +30,14 @@ export async function fetchCurrentConfig() {
     
     const settings = await getSettings(userId);
     const rssSources = await getRSSSources(userId);
-    return { authenticated: true, settings, rssSources };
+    
+    // 确保返回 pushDays 以供前端回显
+    const processedSettings = settings ? {
+      ...settings,
+      pushDays: settings.pushDays || [1, 2, 3, 4, 5]
+    } : null;
+
+    return { authenticated: true, settings: processedSettings, rssSources };
   } catch (e) {
     return { authenticated: false, settings: null, rssSources: [] };
   }

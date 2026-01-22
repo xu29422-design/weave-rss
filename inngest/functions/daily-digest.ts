@@ -21,35 +21,47 @@ async function smartDelay(settings: any) {
 }
 
 /**
- * 调度器：每天触发，遍历所有用户，为每个用户发送一个事件
+ * 调度器：每小时触发，检查哪些用户设置了当前小时推送
  */
 export const dailyScheduler = inngest.createFunction(
   { id: "daily-scheduler", name: "每日简报调度器" },
-  { cron: "0 1 * * 1-5" },  // 每天凌晨 1 点（工作日）
+  { cron: "0 * * * *" },  // 每小时执行一次 (0分触发)
   async ({ step }) => {
     const userIds = await step.run("get-all-users", async () => {
       return await getAllActiveUsers();
     });
 
     if (userIds.length === 0) {
-      console.log("⚠️ 没有活跃用户，跳过调度");
       return { status: "no_users" };
     }
 
-    console.log(`📢 开始调度 ${userIds.length} 个用户的简报生成任务`);
+    const now = new Date();
+    const currentHour = now.getHours().toString();
+    const currentDay = now.getDay(); // 0-6, 0 是周日
+    
+    console.log(`📢 开始调度 ${userIds.length} 个用户的简报生成任务，当前时间: ${currentHour}:00, 星期: ${currentDay}`);
 
-    // 为每个用户发送一个事件
-    await step.run("dispatch-events", async () => {
-      for (const userId of userIds) {
-        await inngest.send({
+    let dispatchedCount = 0;
+    for (const userId of userIds) {
+      const settings = await step.run(`get-settings-${userId}`, async () => {
+        return await getSettings(userId);
+      });
+
+      // 如果用户没设时间（默认 8 点）或者 设定的时间等于当前小时
+      const targetHour = settings?.pushTime || "8";
+      const targetDays = settings?.pushDays || [1, 2, 3, 4, 5]; // 默认工作日
+      
+      if (targetHour === currentHour && targetDays.includes(currentDay)) {
+        await step.sendEvent(`trigger-digest-${userId}`, {
           name: "digest/generate",
           data: { userId },
         });
-        console.log(`✅ 已为用户 ${userId} 发送任务事件`);
+        dispatchedCount++;
+        console.log(`✅ 已为用户 ${userId} 发送任务事件 (目标时间: ${targetHour}, 目标日期: ${targetDays})`);
       }
-    });
+    }
 
-    return { status: "dispatched", userCount: userIds.length };
+    return { status: "dispatched", dispatchedCount, currentHour };
   }
 );
 
