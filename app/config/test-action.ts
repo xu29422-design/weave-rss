@@ -45,7 +45,7 @@ export async function testConfigs(formData: FormData) {
       const { text } = await generateText({
         model,
         prompt: "hi",
-      });
+      } as any);
       if (text) results.ai = { status: "success", message: "Gemini 响应正常！" };
     } else {
       const cleanedUrl = (openaiBaseUrl || "https://api.openai.com/v1").trim().replace(/\/+$/, "");
@@ -58,8 +58,8 @@ export async function testConfigs(formData: FormData) {
       const { text } = await generateText({
         model,
         prompt: "hi",
-        maxTokens: 10,
-      });
+        max_tokens: 10,
+      } as any);
 
       if (text) {
         results.ai = { status: "success", message: "AI 响应正常！" };
