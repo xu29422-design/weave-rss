@@ -52,7 +52,6 @@ export async function testConfigs(formData: FormData) {
       const customOpenAI = createOpenAI({
         baseURL: cleanedUrl,
         apiKey: openaiApiKey,
-        compatibility: 'compatible',
       });
       
       const model = customOpenAI(openaiModel || "glm-4-flash");
