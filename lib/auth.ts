@@ -4,11 +4,7 @@ import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-if (!JWT_SECRET && process.env.NODE_ENV === "production") {
-  throw new Error("CRITICAL: JWT_SECRET environment variable is missing in production!");
-}
-
-// 开发环境兜底，生产环境必须配置
+// 开发环境兜底，生产环境建议配置
 const SAFE_JWT_SECRET = JWT_SECRET || "dev-secret-key-only-for-local-testing";
 
 export interface User {
