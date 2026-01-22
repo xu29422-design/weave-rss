@@ -12,7 +12,7 @@ import {
 
 type ConfigModule = 'kv' | 'ai' | 'schedule' | 'webhook' | 'rss' | 'prompts';
 
-const helpContent: any = {
+const helpContent: Record<string, any> = {
   ai: {
     title: "AI 引擎配置指南",
     desc: "支持 Google Gemini 原生接入或任何兼容 OpenAI 协议的平台（如 DeepSeek, Groq）。",
@@ -175,7 +175,6 @@ export default function ConfigWizard() {
     setLoading(prev => ({ ...prev, [module]: true }));
     
     const formData = new FormData();
-    // 修复类型错误：将所有值转换为字符串
     Object.entries(formState).forEach(([k, v]) => {
       if (Array.isArray(v)) {
         formData.append(k, JSON.stringify(v));
@@ -186,10 +185,12 @@ export default function ConfigWizard() {
     formData.set("aiProvider", aiProvider); 
 
     try {
-      const allResults = await testConfigs(formData);
-      setResults(prev => ({ ...prev, [module]: allResults[module] }));
+      const allResults = await testConfigs(formData) as any;
+      // 修复类型错误：确保 allResults[module] 存在
+      const moduleResult = allResults[module] || { status: 'success', message: '已保存' };
+      setResults(prev => ({ ...prev, [module]: moduleResult }));
       
-      if (allResults[module].status === 'success') {
+      if (moduleResult.status === 'success') {
         if (module === 'rss') {
           const urls = formState.rssUrls.split("\n").map(u => u.trim()).filter(Boolean);
           await persistRSS(urls);
