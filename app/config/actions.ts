@@ -4,6 +4,7 @@ import { saveSettings, saveRSSSources, getSettings, getRSSSources, Settings } fr
 import { getCurrentUserFromCookie } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import { inngest } from "@/inngest/client";
 
 /**
  * 获取当前用户 ID（从 Cookie）
@@ -16,6 +17,22 @@ async function getCurrentUserId(): Promise<string | null> {
   
   const user = getCurrentUserFromCookie(`auth_token=${authToken.value}`);
   return user?.userId || null;
+}
+
+/**
+ * 手动触发一次简报生成任务
+ */
+export async function triggerDigest() {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error("未登录");
+
+  // 使用 inngest 客户端发送事件，这在服务端是安全的
+  await inngest.send({
+    name: "digest/generate",
+    data: { userId },
+  });
+
+  return { success: true };
 }
 
 /**

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { testConfigs } from "./test-action";
-import { fetchCurrentConfig, persistSettings, persistRSS } from "./actions";
+import { fetchCurrentConfig, persistSettings, persistRSS, triggerDigest } from "./actions";
 import { 
   Database, Bot, Webhook, CheckCircle2, AlertCircle,
   Loader2, ExternalLink, BookOpen, ArrowRight, Sparkles,
