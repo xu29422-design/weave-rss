@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, ArrowRight, Zap, Target, Clock, Shield, Rss, Brain, Bell, Menu, X, ChevronRight, Mail, MessageSquare, Bot } from "lucide-react";
+import { Sparkles, ArrowRight, Zap, Target, Clock, Shield, Rss, Brain, Bell, Menu, X, ChevronRight, Mail, MessageSquare, Bot, User } from "lucide-react";
 import { siGithub, siProducthunt, siMedium, siTechcrunch, siArstechnica, siNewyorktimes, siVercel } from "simple-icons/icons";
 import { motion, useScroll, useTransform } from "framer-motion";
 
 export default function Home() {
   const router = useRouter();
   const [authenticated, setAuthenticated] = useState(false);
+  const [username, setUsername] = useState("");
   const { scrollY } = useScroll();
   const y1 = useTransform(scrollY, [0, 500], [0, 200]);
   const y2 = useTransform(scrollY, [0, 500], [0, -150]);
@@ -28,6 +29,9 @@ export default function Home() {
         const response = await fetch("/api/auth/me");
         const data = await response.json();
         setAuthenticated(data.authenticated);
+        if (data.authenticated) {
+          setUsername(data.username);
+        }
       } catch {
         setAuthenticated(false);
       }
@@ -68,12 +72,21 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-6">
             {authenticated ? (
-              <button
-                onClick={() => router.push("/config")}
-                className="px-6 py-2.5 bg-black text-white rounded-full font-bold hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
-              >
-                进入后台
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => router.push("/dashboard")}
+                  className="px-6 py-2.5 bg-black text-white rounded-full font-bold hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                >
+                  进入后台
+                </button>
+                <div 
+                  onClick={() => router.push("/dashboard?tab=settings")}
+                  className="w-10 h-10 bg-blue-50 rounded-full border border-blue-100 flex items-center justify-center cursor-pointer hover:bg-blue-100 transition-all group"
+                  title={username}
+                >
+                  <User className="w-5 h-5 text-blue-600 group-hover:scale-110 transition-transform" />
+                </div>
+              </div>
             ) : (
               <button
                 onClick={() => openAuth("login")}

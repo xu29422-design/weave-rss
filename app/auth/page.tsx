@@ -257,7 +257,7 @@ function AuthContent() {
         return;
       }
 
-      router.push("/config");
+      router.push(data.redirectTo || "/dashboard");
       router.refresh();
     } catch (err: any) {
       setError("网络错误，请重试");

@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
       success: true,
       userId: result.userId,
       username,
+      redirectTo: "/dashboard"
     });
 
     response.cookies.set("auth_token", token, {
