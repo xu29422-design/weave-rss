@@ -3,14 +3,15 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { testConfigs } from "./test-action";
-import { fetchCurrentConfig, persistSettings, persistRSS, triggerDigest } from "./actions";
+import { fetchCurrentConfig, persistSettings, persistRSS, triggerDigest, markConfigAsCompleted } from "./actions";
 import { 
   Database, Bot, Webhook, CheckCircle2, AlertCircle,
   Loader2, ExternalLink, BookOpen, ArrowRight, Sparkles,
-  Rss, Link2, Cpu, Globe, Settings2, LogOut, User
+  Rss, Link2, Cpu, Globe, Settings2, LogOut, User,
+  Play, Edit3, ChevronRight, Clock, Calendar, Zap, LayoutDashboard
 } from "lucide-react";
 
-type ConfigModule = 'kv' | 'ai' | 'schedule' | 'webhook' | 'rss' | 'prompts';
+type ConfigModule = 'ai' | 'schedule' | 'webhook' | 'rss' | 'prompts';
 
 const helpContent: Record<string, any> = {
   ai: {
@@ -21,7 +22,6 @@ const helpContent: Record<string, any> = {
       { t: "Base URL", d: "如果使用非 OpenAI 官方服务，请填写中转或私有地址。" },
       { t: "模型匹配", d: "请确保填写的 Model ID 与平台提供的一致。" }
     ],
-    link: "https://aistudio.google.com/",
     color: "from-indigo-600 to-purple-500"
   },
   schedule: {
@@ -32,7 +32,6 @@ const helpContent: Record<string, any> = {
       { t: "选择日期", d: "勾选您希望接收推送的星期。" },
       { t: "时区说明", d: "目前统一使用北京时间 (UTC+8)。" }
     ],
-    link: "#",
     color: "from-blue-600 to-cyan-500"
   },
   prompts: {
@@ -43,7 +42,6 @@ const helpContent: Record<string, any> = {
       { t: "汇总阶段", d: "Editor Agent 负责将分类内容撰写成优美的日报段落。" },
       { t: "TL;DR", d: "全局总结 Agent 负责生成最顶部的“今日焦点”。" }
     ],
-    link: "#",
     color: "from-fuchsia-600 to-pink-500"
   },
   webhook: {
@@ -54,7 +52,6 @@ const helpContent: Record<string, any> = {
       { t: "获取链接", d: "复制机器人提供的 Webhook URL。" },
       { t: "验证联通", d: "点击测试按钮，确认您的机器人能收到推送。" }
     ],
-    link: "#",
     color: "from-emerald-600 to-teal-500"
   },
   rss: {
@@ -65,7 +62,6 @@ const helpContent: Record<string, any> = {
       { t: "批量录入", d: "每行输入一个 URL，支持标准 RSS/Atom 格式。" },
       { t: "时效过滤", d: "系统会自动过滤 24h 内的新闻，避免信息过载。" }
     ],
-    link: "https://github.com/AboutRSS/ALL-about-RSS",
     color: "from-orange-500 to-amber-500"
   }
 };
@@ -74,18 +70,20 @@ export default function ConfigWizard() {
   const router = useRouter();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [username, setUsername] = useState<string>("");
+  const [isDashboard, setIsDashboard] = useState<boolean>(false);
   const [activeModule, setActiveModule] = useState<ConfigModule>('ai');
   const [promptTab, setPromptTab] = useState<'analyst' | 'editor' | 'tldr'>('analyst');
   const [webhookTab, setWebhookTab] = useState<'webhook' | 'email'>('webhook');
   const [aiProvider, setAiProvider] = useState<'google' | 'openai'>('google');
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<Record<string, any>>({});
-  const [testPushStatus, setTestPushStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
-  const [testPushMessage, setTestPushMessage] = useState<string>("");
   
+  // 任务执行状态
+  const [taskStatus, setTaskStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
+  const [taskProgress, setTaskStatusMessage] = useState<string>("");
+  const [progressPercent, setProgressPercent] = useState<number>(0);
+
   const [formState, setFormState] = useState({
-    kvUrl: "",
-    kvToken: "",
     aiProvider: "google" as "google" | "openai",
     geminiApiKey: "",
     openaiApiKey: "",
@@ -93,7 +91,7 @@ export default function ConfigWizard() {
     openaiModel: "",
     webhookUrl: "",
     pushTime: "8",
-    pushDays: [1, 2, 3, 4, 5],
+    pushDays: [1, 2, 3, 4, 5] as number[],
     rssUrls: "",
     analystPrompt: `你是一位专业的科技情报分析师。请对提供的单条新闻条目进行分析并分类。
 要求：
@@ -123,29 +121,21 @@ export default function ConfigWizard() {
       try {
         const response = await fetch("/api/auth/me");
         const data = await response.json();
-        
-        if (!data.authenticated) {
-          router.push("/auth");
-          return;
-        }
-        
+        if (!data.authenticated) { router.push("/auth"); return; }
         setAuthenticated(true);
         setUsername(data.username);
-      } catch (error) {
-        router.push("/auth");
-      }
+      } catch (error) { router.push("/auth"); }
     }
     checkAuth();
   }, [router]);
 
+  // 初始化数据
   useEffect(() => {
     async function init() {
       if (!authenticated) return;
       const data = await fetchCurrentConfig();
       if (data.settings || data.rssSources) {
         const newState = {
-          kvUrl: "", 
-          kvToken: "",
           aiProvider: data.settings?.aiProvider || "google",
           geminiApiKey: data.settings?.geminiApiKey || "",
           openaiApiKey: data.settings?.openaiApiKey || "",
@@ -161,6 +151,15 @@ export default function ConfigWizard() {
         };
         setFormState(newState);
         if (data.settings?.aiProvider) setAiProvider(data.settings.aiProvider);
+        if (data.settings?.configCompleted) setIsDashboard(true);
+        
+        // 标记所有已保存的模块为成功
+        const initialResults: any = {};
+        if (data.settings?.geminiApiKey || data.settings?.openaiApiKey) initialResults.ai = { status: 'success', message: '已保存' };
+        if (data.settings?.webhookUrl) initialResults.webhook = { status: 'success', message: '已保存' };
+        if (data.rssSources?.length > 0) initialResults.rss = { status: 'success', message: '已保存' };
+        initialResults.prompts = { status: 'success', message: '已保存' };
+        setResults(initialResults);
       }
     }
     init();
@@ -173,20 +172,15 @@ export default function ConfigWizard() {
 
   async function testAndSave(module: ConfigModule) {
     setLoading(prev => ({ ...prev, [module]: true }));
-    
     const formData = new FormData();
     Object.entries(formState).forEach(([k, v]) => {
-      if (Array.isArray(v)) {
-        formData.append(k, JSON.stringify(v));
-      } else {
-        formData.append(k, String(v));
-      }
+      if (Array.isArray(v)) formData.append(k, JSON.stringify(v));
+      else formData.append(k, String(v));
     });
     formData.set("aiProvider", aiProvider); 
 
     try {
       const allResults = await testConfigs(formData) as any;
-      // 修复类型错误：确保 allResults[module] 存在
       const moduleResult = allResults[module] || { status: 'success', message: '已保存' };
       setResults(prev => ({ ...prev, [module]: moduleResult }));
       
@@ -196,20 +190,11 @@ export default function ConfigWizard() {
           await persistRSS(urls);
         } else {
           await persistSettings({
+            ...formState,
             aiProvider: aiProvider,
-            geminiApiKey: formState.geminiApiKey,
-            openaiApiKey: formState.openaiApiKey,
-            openaiBaseUrl: formState.openaiBaseUrl,
-            openaiModel: formState.openaiModel,
-            webhookUrl: formState.webhookUrl,
-            analystPrompt: formState.analystPrompt,
-            editorPrompt: formState.editorPrompt,
-            tldrPrompt: formState.tldrPrompt,
-            pushTime: formState.pushTime,
-            pushDays: formState.pushDays
-          });
+          } as any);
         }
-        // 自动跳转到下一个模块
+        // 自动跳转
         if (module === 'ai') setActiveModule('schedule');
         else if (module === 'schedule') setActiveModule('prompts');
         else if (module === 'prompts') setActiveModule('webhook');
@@ -224,27 +209,31 @@ export default function ConfigWizard() {
 
   const allPassed = results.ai?.status === 'success' && results.prompts?.status === 'success' && results.webhook?.status === 'success' && results.rss?.status === 'success';
 
-  const handleManualTrigger = async () => {
-    if (!allPassed) {
-      alert("请先完成并保存所有配置模块的验证");
-      return;
-    }
-    
-    setTestPushStatus('running');
-    setTestPushMessage("正在启动测试推送任务...");
+  const handleRunTask = async () => {
+    setTaskStatus('running');
+    setTaskStatusMessage("正在初始化任务...");
+    setProgressPercent(10);
     
     try {
+      // 模拟进度
+      setTimeout(() => { setTaskStatusMessage("正在抓取 RSS 订阅源..."); setProgressPercent(30); }, 1000);
+      setTimeout(() => { setTaskStatusMessage("AI 正在深度分析内容..."); setProgressPercent(60); }, 3000);
+      setTimeout(() => { setTaskStatusMessage("正在组装并推送简报..."); setProgressPercent(90); }, 6000);
+
       const res = await triggerDigest();
-      
       if (res.success) {
-        setTestPushStatus('success');
-        setTestPushMessage("测试任务已在后台启动！请在 1-3 分钟后检查您的机器人。");
+        setTimeout(() => {
+          setTaskStatus('success');
+          setTaskStatusMessage("任务启动成功！请在 1-3 分钟后检查您的机器人。");
+          setProgressPercent(100);
+        }, 8000);
       } else {
         throw new Error("启动失败");
       }
     } catch (e) {
-      setTestPushStatus('error');
-      setTestPushMessage("无法启动测试任务，请检查 Inngest 服务配置。");
+      setTaskStatus('error');
+      setTaskStatusMessage("任务启动失败，请检查 Inngest 服务配置。");
+      setProgressPercent(0);
     }
   };
 
@@ -261,6 +250,95 @@ export default function ConfigWizard() {
     );
   }
 
+  // 仪表盘模式
+  if (isDashboard) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col w-full overflow-x-hidden font-sans">
+        <header className="sticky top-0 z-50 bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-black rounded-xl flex items-center justify-center shadow-md">
+              <span className="text-white font-serif italic text-base select-none">W</span>
+            </div>
+            <span className="text-xl font-black text-gray-900 tracking-tighter font-serif">Weave <span className="ml-3 text-gray-400 font-normal text-lg">RSS</span></span>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full">
+              <User className="w-4 h-4 text-gray-600" />
+              <span className="text-sm font-bold text-gray-700">{username}</span>
+            </div>
+            <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors font-bold text-sm">
+              <LogOut className="w-4 h-4" /> 退出登录
+            </button>
+          </div>
+        </header>
+
+        <main className="flex-1 max-w-5xl mx-auto w-full p-8 lg:p-16">
+          {/* 上部：操作区 */}
+          <div className="bg-white rounded-[40px] border-2 border-gray-100 p-10 shadow-xl shadow-blue-900/5 mb-12">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+              <div className="flex-1 text-center md:text-left">
+                <h2 className="text-3xl font-black text-gray-900 mb-3 flex items-center justify-center md:justify-start gap-3">
+                  <Zap className="w-8 h-8 text-blue-600 fill-blue-600" /> 任务控制中心
+                </h2>
+                <p className="text-gray-500 font-medium">配置已就绪。您可以立即执行一次全量任务，或修改您的配置。</p>
+              </div>
+              <div className="flex gap-4 w-full md:w-auto">
+                <button 
+                  onClick={() => { setIsDashboard(false); markConfigAsCompleted(false); }}
+                  className="flex-1 md:flex-none px-8 py-4 bg-gray-100 text-gray-600 rounded-2xl font-black hover:bg-gray-200 transition-all flex items-center justify-center gap-2"
+                >
+                  <Edit3 className="w-5 h-5" /> 修改配置
+                </button>
+                <button 
+                  onClick={handleRunTask}
+                  disabled={taskStatus === 'running'}
+                  className="flex-1 md:flex-none px-10 py-4 bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-500 shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2 disabled:bg-gray-400"
+                >
+                  {taskStatus === 'running' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-current" />}
+                  立即测试并推送
+                </button>
+              </div>
+            </div>
+
+            {/* 进度条 */}
+            {taskStatus !== 'idle' && (
+              <div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="flex justify-between items-end mb-4">
+                  <span className={`text-sm font-black uppercase tracking-widest ${taskStatus === 'error' ? 'text-red-500' : 'text-blue-600'}`}>
+                    {taskProgress}
+                  </span>
+                  <span className="text-2xl font-black text-gray-900">{progressPercent}%</span>
+                </div>
+                <div className="h-4 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-200">
+                  <div 
+                    className={`h-full transition-all duration-700 ease-out rounded-full ${taskStatus === 'error' ? 'bg-red-500' : 'bg-blue-600 shadow-[0_0_20px_rgba(37,99,235,0.5)]'}`}
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+                {taskStatus === 'success' && (
+                  <div className="mt-6 p-4 bg-green-50 border border-green-100 rounded-2xl flex items-center gap-3 text-green-700 font-bold animate-in zoom-in">
+                    <CheckCircle2 className="w-5 h-5" /> 任务已成功发送到云端处理队列
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 下部：配置展示 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <SummaryCard icon={<Cpu className="text-indigo-500" />} title="AI 引擎" value={formState.aiProvider === 'google' ? "Google Gemini" : `OpenAI (${formState.openaiModel})`} />
+            <SummaryCard icon={<Clock className="text-blue-500" />} title="推送时间" value={`每天 ${formState.pushTime}:00`} />
+            <SummaryCard icon={<Calendar className="text-purple-500" />} title="推送周期" value={formState.pushDays.length === 7 ? "每天" : formState.pushDays.length === 5 ? "工作日" : "自定义"} />
+            <SummaryCard icon={<Webhook className="text-emerald-500" />} title="推送渠道" value={formState.webhookUrl ? "Webhook 机器人" : "未配置"} />
+            <SummaryCard icon={<Rss className="text-orange-500" />} title="订阅源" value={`${formState.rssUrls.split('\n').filter(Boolean).length} 个活跃信源`} />
+            <SummaryCard icon={<Sparkles className="text-pink-500" />} title="提示词" value="已自定义" />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // 配置模式
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col w-full overflow-x-hidden font-sans">
       <header className="sticky top-0 z-50 bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between">
@@ -275,12 +353,8 @@ export default function ConfigWizard() {
             <User className="w-4 h-4 text-gray-600" />
             <span className="text-sm font-bold text-gray-700">{username}</span>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors font-bold text-sm"
-          >
-            <LogOut className="w-4 h-4" />
-            退出登录
+          <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors font-bold text-sm">
+            <LogOut className="w-4 h-4" /> 退出登录
           </button>
         </div>
       </header>
@@ -293,7 +367,7 @@ export default function ConfigWizard() {
                 Weave <span className="ml-4 text-blue-600 font-normal">RSS</span>
               </h1>
               <p className="text-gray-500 mt-4 text-lg font-medium leading-relaxed">
-                您的私人情报助理。聚合全球信源，AI 深度精读。
+                完成以下 5 步配置，开启您的智能情报之旅。
               </p>
             </div>
 
@@ -320,9 +394,8 @@ export default function ConfigWizard() {
               </ModuleCard>
 
               <ModuleCard 
-                id="schedule" title="02. 定时推送设置" active={activeModule === 'schedule'} result={{status: 'success', message: '已设置'}} loading={false}
-                onActive={() => setActiveModule('schedule')} icon={<Globe className="w-6 h-6" />}
-                hideTestButton={true}
+                id="schedule" title="02. 定时推送设置" active={activeModule === 'schedule'} result={{status: 'success', message: '已保存'}} loading={loading.schedule}
+                onActive={() => setActiveModule('schedule')} onTest={() => testAndSave('schedule')} icon={<Globe className="w-6 h-6" />}
               >
                 <div className="pt-4 text-left">
                   <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">推送日期</label>
@@ -339,7 +412,6 @@ export default function ConfigWizard() {
                             ? formState.pushDays.filter(d => d !== day.val)
                             : [...formState.pushDays, day.val];
                           setFormState(prev => ({ ...prev, pushDays: newDays }));
-                          persistSettings({ ...formState, aiProvider, pushDays: newDays } as any);
                         }}
                         className={`px-4 py-2 text-sm font-bold rounded-xl border transition-all ${
                           formState.pushDays.includes(day.val)
@@ -352,39 +424,13 @@ export default function ConfigWizard() {
                     ))}
                   </div>
 
-                  <div className="flex gap-4 mb-8">
-                    <button type="button" onClick={() => {
-                      const d = [1,2,3,4,5,6,0];
-                      setFormState(prev => ({ ...prev, pushDays: d }));
-                      persistSettings({ ...formState, aiProvider, pushDays: d } as any);
-                    }} className="text-xs font-bold text-blue-600 hover:underline">全选</button>
-                    <button type="button" onClick={() => {
-                      const d = [1,2,3,4,5];
-                      setFormState(prev => ({ ...prev, pushDays: d }));
-                      persistSettings({ ...formState, aiProvider, pushDays: d } as any);
-                    }} className="text-xs font-bold text-blue-600 hover:underline">仅工作日</button>
-                    <button type="button" onClick={() => {
-                      const d = [6,0];
-                      setFormState(prev => ({ ...prev, pushDays: d }));
-                      persistSettings({ ...formState, aiProvider, pushDays: d } as any);
-                    }} className="text-xs font-bold text-blue-600 hover:underline">仅周末</button>
-                  </div>
-
                   <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">每日推送时间 (24小时制)</label>
                   <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-3">
                     {Array.from({ length: 24 }).map((_, i) => (
                       <button
                         key={i}
                         type="button"
-                        onClick={() => {
-                          const newTime = i.toString();
-                          setFormState(prev => ({ ...prev, pushTime: newTime }));
-                          persistSettings({
-                            ...formState,
-                            aiProvider: aiProvider,
-                            pushTime: newTime
-                          } as any);
-                        }}
+                        onClick={() => setFormState(prev => ({ ...prev, pushTime: i.toString() }))}
                         className={`py-2 text-sm font-bold rounded-xl border transition-all ${
                           formState.pushTime === i.toString()
                             ? "bg-blue-600 text-white border-blue-600 shadow-lg scale-105"
@@ -395,7 +441,6 @@ export default function ConfigWizard() {
                       </button>
                     ))}
                   </div>
-                  <p className="text-xs text-gray-400 mt-4 ml-1">※ 系统将根据此时间点（UTC+8）在选定日期为您推送情报。</p>
                 </div>
               </ModuleCard>
 
@@ -409,29 +454,10 @@ export default function ConfigWizard() {
                     <button type="button" onClick={() => setPromptTab('editor')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${promptTab === 'editor' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}>汇总阶段</button>
                     <button type="button" onClick={() => setPromptTab('tldr')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${promptTab === 'tldr' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}>今日焦点</button>
                   </div>
-
                   <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    {promptTab === 'analyst' && (
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">内容分析 Prompt (Analyst)</label>
-                        <textarea name="analystPrompt" rows={8} value={formState.analystPrompt} onChange={handleChange} placeholder="留空使用默认值..." className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-base font-sans focus:ring-2 focus:ring-blue-600 outline-none transition-all resize-none" />
-                        <p className="text-xs text-gray-400 mt-1 ml-1">※ 负责单条内容的打分、总结 and 分类。</p>
-                      </div>
-                    )}
-                    {promptTab === 'editor' && (
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">汇总撰写 Prompt (Editor)</label>
-                        <textarea name="editorPrompt" rows={8} value={formState.editorPrompt} onChange={handleChange} placeholder="支持 ${category} 和 ${count} 变量..." className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-base font-sans focus:ring-2 focus:ring-blue-600 outline-none transition-all resize-none" />
-                        <p className="text-xs text-gray-400 mt-1 ml-1">※ 负责将分类内容撰写成日报段落。支持变量：{"${category}"}, {"${count}"}</p>
-                      </div>
-                    )}
-                    {promptTab === 'tldr' && (
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">今日焦点 Prompt (TL;DR)</label>
-                        <textarea name="tldrPrompt" rows={8} value={formState.tldrPrompt} onChange={handleChange} placeholder="留空使用默认值..." className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-base font-sans focus:ring-2 focus:ring-blue-600 outline-none transition-all resize-none" />
-                        <p className="text-xs text-gray-400 mt-1 ml-1">※ 负责生成最顶部的“今日焦点”总结。</p>
-                      </div>
-                    )}
+                    {promptTab === 'analyst' && <textarea name="analystPrompt" rows={8} value={formState.analystPrompt} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-base font-sans focus:ring-2 focus:ring-blue-600 outline-none transition-all resize-none" />}
+                    {promptTab === 'editor' && <textarea name="editorPrompt" rows={8} value={formState.editorPrompt} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-base font-sans focus:ring-2 focus:ring-blue-600 outline-none transition-all resize-none" />}
+                    {promptTab === 'tldr' && <textarea name="tldrPrompt" rows={8} value={formState.tldrPrompt} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-base font-sans focus:ring-2 focus:ring-blue-600 outline-none transition-all resize-none" />}
                   </div>
                 </div>
               </ModuleCard>
@@ -441,24 +467,7 @@ export default function ConfigWizard() {
                 onActive={() => setActiveModule('webhook')} onTest={() => testAndSave('webhook')} icon={<Webhook className="w-6 h-6" />}
               >
                 <div className="pt-4 text-left">
-                  <div className="flex bg-gray-100 p-1 rounded-xl mb-6">
-                    <button type="button" onClick={() => setWebhookTab('webhook')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${webhookTab === 'webhook' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}>Webhook 机器人</button>
-                    <button type="button" onClick={() => setWebhookTab('email')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${webhookTab === 'email' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}>电子邮件 (可选)</button>
-                  </div>
-
-                  <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    {webhookTab === 'webhook' ? (
-                      <div className="space-y-4">
-                        <Input label="Webhook URL" name="webhookUrl" value={formState.webhookUrl} onChange={handleChange} placeholder="机器人 Webhook 地址" />
-                        <p className="text-xs text-gray-400 ml-1">※ 支持 WPS、企业微信、飞书、钉钉等标准 Webhook。</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <Input label="接收邮箱" name="emailAddress" value={(formState as any).emailAddress || ""} onChange={handleChange} placeholder="yourname@example.com" />
-                        <p className="text-xs text-gray-400 ml-1">※ 简报将每天定时发送至您的电子邮箱（即将上线）。</p>
-                      </div>
-                    )}
-                  </div>
+                  <Input label="Webhook URL" name="webhookUrl" value={formState.webhookUrl} onChange={handleChange} placeholder="机器人 Webhook 地址" />
                 </div>
               </ModuleCard>
 
@@ -467,24 +476,32 @@ export default function ConfigWizard() {
                 onActive={() => setActiveModule('rss')} onTest={() => testAndSave('rss')} icon={<Rss className="w-6 h-6" />}
               >
                 <div className="pt-4 text-left">
-                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">RSS 链接列表 (每行一个)</label>
                   <textarea name="rssUrls" rows={6} value={formState.rssUrls} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-base font-sans focus:ring-2 focus:ring-blue-600 outline-none transition-all resize-none mt-1.5" />
                 </div>
               </ModuleCard>
             </div>
+
+            {allPassed && (
+              <div className="mt-12 animate-in slide-in-from-bottom-8 duration-700">
+                <button 
+                  onClick={() => { setIsDashboard(true); markConfigAsCompleted(true); }}
+                  className="w-full py-6 bg-black text-white rounded-[30px] font-black text-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl shadow-black/20 flex items-center justify-center gap-4"
+                >
+                  <LayoutDashboard className="w-6 h-6" /> 进入我的仪表盘
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="lg:w-[30%] bg-gray-900 text-white p-8 lg:p-12 xl:p-16 flex flex-col justify-center relative overflow-hidden min-h-screen">
           <div className={`absolute -top-32 -right-32 w-[500px] h-[500px] rounded-full bg-gradient-to-br ${helpContent[activeModule]?.color || 'from-blue-600 to-purple-500'} opacity-20 blur-[100px] transition-all duration-700`} />
-          
-          <div className="relative z-10 w-full" id="guide-section">
+          <div className="relative z-10 w-full">
             <header className="mb-10">
               <Settings2 className="w-12 h-12 text-gray-500 mb-6" />
               <h3 className="text-2xl xl:text-3xl font-black mb-4 tracking-tight">{helpContent[activeModule]?.title}</h3>
               <p className="text-base text-gray-400 leading-relaxed font-medium">{helpContent[activeModule]?.desc}</p>
             </header>
-
             <div className="space-y-8 text-left">
               {helpContent[activeModule]?.steps.map((step: any, idx: number) => (
                 <div key={idx} className="flex gap-6 group">
@@ -499,46 +516,21 @@ export default function ConfigWizard() {
                 </div>
               ))}
             </div>
-
-            {allPassed && (
-              <div className="mt-12 p-8 bg-blue-600/10 border border-blue-500/30 rounded-3xl animate-in zoom-in duration-500">
-                 <h4 className="text-blue-400 font-black mb-4 flex items-center gap-2 text-lg">
-                   <Sparkles className="w-5 h-5" /> 立即测试推送
-                 </h4>
-                 <p className="text-sm text-gray-400 mb-6 leading-relaxed text-left">
-                   配置已就绪。点击下方按钮将立即触发一次全量 RSS 抓取、AI 分析并推送至您的机器人。
-                 </p>
-                 
-                 <button
-                   onClick={handleManualTrigger}
-                   disabled={testPushStatus === 'running'}
-                   className={`w-full py-4 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-3 ${
-                     testPushStatus === 'running' 
-                       ? 'bg-gray-800 text-gray-500 cursor-not-allowed' 
-                       : 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-600/20'
-                   }`}
-                 >
-                   {testPushStatus === 'running' ? <Loader2 className="w-6 h-6 animate-spin" /> : <ArrowRight className="w-6 h-6" />}
-                   {testPushStatus === 'running' ? "正在处理中..." : "立即执行一次"}
-                 </button>
-
-                 {testPushStatus !== 'idle' && (
-                   <div className={`mt-6 p-4 rounded-2xl text-sm font-bold flex items-start gap-3 animate-in fade-in slide-in-from-top-2 ${
-                     testPushStatus === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 
-                     testPushStatus === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 
-                     'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                   }`}>
-                     {testPushStatus === 'success' ? <CheckCircle2 className="w-5 h-5 shrink-0" /> : 
-                      testPushStatus === 'error' ? <AlertCircle className="w-5 h-5 shrink-0" /> : 
-                      <Loader2 className="w-5 h-5 animate-spin shrink-0" />}
-                     <span className="text-left">{testPushMessage}</span>
-                   </div>
-                 )}
-              </div>
-            )}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SummaryCard({ icon, title, value }: any) {
+  return (
+    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="p-2 bg-gray-50 rounded-xl">{icon}</div>
+        <span className="text-xs font-black text-gray-400 uppercase tracking-widest">{title}</span>
+      </div>
+      <div className="text-lg font-bold text-gray-900 truncate">{value}</div>
     </div>
   );
 }
@@ -571,7 +563,7 @@ function ModuleCard({ id, title, icon, active, result, loading, onActive, onTest
   );
 }
 
-function Input({ label, mono, ...props }: any) {
+function Input({ label, ...props }: any) {
   return (
     <div className="space-y-1.5 text-left">
       <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">{label}</label>

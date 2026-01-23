@@ -51,7 +51,8 @@ export async function fetchCurrentConfig() {
     // 确保返回 pushDays 以供前端回显
     const processedSettings = settings ? {
       ...settings,
-      pushDays: settings.pushDays || [1, 2, 3, 4, 5]
+      pushDays: settings.pushDays || [1, 2, 3, 4, 5],
+      configCompleted: settings.configCompleted || false
     } : null;
 
     return { authenticated: true, settings: processedSettings, rssSources };
@@ -84,6 +85,21 @@ export async function persistRSS(rssUrls: string[]) {
   }
   
   await saveRSSSources(userId, rssUrls);
+  revalidatePath("/config");
+  return { success: true };
+}
+
+/**
+ * 标记配置已完成
+ */
+export async function markConfigAsCompleted(completed: boolean = true) {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error("未登录");
+
+  const settings = await getSettings(userId);
+  if (settings) {
+    await saveSettings(userId, { ...settings, configCompleted: completed });
+  }
   revalidatePath("/config");
   return { success: true };
 }

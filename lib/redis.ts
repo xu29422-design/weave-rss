@@ -13,6 +13,7 @@ export interface Settings {
   tldrPrompt?: string;
   pushTime?: string; // 定时推送时间 (0-23 的字符串)
   pushDays?: number[]; // 推送日期 (0-6，0代表周日)
+  configCompleted?: boolean; // 标记配置是否已全部完成
 }
 
 /**
