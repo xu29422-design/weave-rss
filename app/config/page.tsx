@@ -234,16 +234,9 @@ export default function ConfigWizard() {
     setTestPushMessage("正在启动测试推送任务...");
     
     try {
-      const res = await fetch("/api/inngest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "digest/generate",
-          data: { userId: username } 
-        })
-      });
+      const res = await triggerDigest();
       
-      if (res.ok) {
+      if (res.success) {
         setTestPushStatus('success');
         setTestPushMessage("测试任务已在后台启动！请在 1-3 分钟后检查您的机器人。");
       } else {
@@ -251,7 +244,7 @@ export default function ConfigWizard() {
       }
     } catch (e) {
       setTestPushStatus('error');
-      setTestPushMessage("无法启动测试任务，请检查网络或 Inngest 服务。");
+      setTestPushMessage("无法启动测试任务，请检查 Inngest 服务配置。");
     }
   };
 
