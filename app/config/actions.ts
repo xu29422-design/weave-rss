@@ -52,7 +52,8 @@ export async function fetchCurrentConfig() {
     const processedSettings = settings ? {
       ...settings,
       pushDays: settings.pushDays || [1, 2, 3, 4, 5],
-      configCompleted: settings.configCompleted || false
+      configCompleted: settings.configCompleted || false,
+      subscribedThemes: settings.subscribedThemes || []
     } : null;
 
     return { authenticated: true, settings: processedSettings, rssSources };

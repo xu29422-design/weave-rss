@@ -14,6 +14,7 @@
     "@ai-sdk/openai": "^3.0.13",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/three": "^0.182.0",
     "@vercel/kv": "^1.0.1",
     "ai": "^6.0.42",
     "bcryptjs": "^3.0.3",
@@ -30,6 +31,7 @@
     "simple-icons": "^16.6.0",
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
+    "three": "^0.182.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {

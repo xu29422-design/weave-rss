@@ -16,6 +16,7 @@ export interface Settings {
   projectName?: string; // 订阅项目名称
   configCompleted?: boolean; // 标记配置是否已全部完成
   configMode?: 'simple' | 'pro'; // 配置模式
+  subscribedThemes?: string[]; // 已订阅的主题ID列表
 }
 
 /**

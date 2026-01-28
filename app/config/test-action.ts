@@ -100,7 +100,7 @@ export async function testConfigs(formData: FormData) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         msgtype: "text",
-        text: { content: "Weave RSS: 这是一个测试连接消息" },
+        text: { content: "Weave: 这是一个测试连接消息" },
       }),
     });
     if (res.ok) {

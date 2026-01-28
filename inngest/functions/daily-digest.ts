@@ -177,7 +177,7 @@ export const digestWorker = inngest.createFunction(
       // 页脚
       lines.push("---");
       lines.push("");
-      lines.push("> 本报告由 Weave RSS 编织生成");
+      lines.push("> 本报告由 Weave 编织生成");
       
       const reportContent = lines.join("\n");
       

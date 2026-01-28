@@ -1,7 +1,7 @@
-# 🧶 Weave RSS
+# 🧶 Weave
 > **Read Less, Know More.** 您的私人 AI 情报助理。
 
-Weave RSS 是一款基于 AI 的自动化情报处理系统。它能自动聚合您关注的 RSS 订阅源，通过大语言模型（Gemini / OpenAI）进行深度精读、打分和总结，并在每天早晨为您生成一份结构化的情报简报，直达您的邮箱或协作机器人。
+Weave 是一款基于 AI 的自动化情报处理系统。它能自动聚合您关注的 RSS 订阅源，通过大语言模型（Gemini / OpenAI）进行深度精读、打分和总结，并在每天早晨为您生成一份结构化的情报简报，直达您的邮箱或协作机器人。
 
 ---
 
@@ -62,4 +62,4 @@ npx inngest-cli@latest dev
 ---
 
 ## 📄 开源协议
-MIT License © 2026 Weave RSS.
+MIT License © 2026 Weave.

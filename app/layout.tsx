@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
+import GlobalBackground from "@/components/GlobalBackground";
 
 // 英文/正文无衬线字体 (等线)
 const inter = Inter({ 
@@ -27,7 +28,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Weave RSS | 您的智能情报官",
+  title: "Weave | 您的智能情报官",
   description: "AI 驱动的每日行业情报聚合服务",
 };
 
@@ -39,7 +40,10 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" className="scroll-smooth">
       <body className={`${inter.variable} ${jetbrains.variable} ${playfair.variable} font-sans antialiased selection:bg-orange-500 selection:text-white`}>
-        <main>{children}</main>
+        <div className="fixed inset-0 z-[-1]">
+          <GlobalBackground />
+        </div>
+        <main className="relative z-10">{children}</main>
       </body>
     </html>
   );

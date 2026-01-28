@@ -12,8 +12,36 @@ import { motion, AnimatePresence } from "framer-motion";
 import { fetchCurrentConfig, persistSettings, persistRSS } from "../config/actions";
 import { pushToAdminBot } from "../config/admin-actions";
 
+// 类型定义
+type ThemeStyle = 'tech' | 'finance' | 'paper' | 'chat' | 'card' | 'minimal';
+
+interface ThemePreviewItem {
+  title?: string;
+  meta?: string;
+  value?: string;
+  trend?: 'up' | 'down';
+  snippet?: string;
+  role?: 'user' | 'ai';
+  content?: string;
+  tag?: string;
+  color?: string;
+  author?: string;
+}
+
+interface Theme {
+  id: string;
+  title: string;
+  desc: string;
+  category: string;
+  icon: React.ReactNode;
+  style: ThemeStyle;
+  color: string;
+  sources: string[];
+  preview: ThemePreviewItem[];
+}
+
 // 预设主题数据，增加样式配置
-const PRESET_THEMES = [
+const PRESET_THEMES: Theme[] = [
   {
     id: "tech",
     title: "科技专栏",
@@ -234,37 +262,37 @@ const CATEGORIES = [
 ];
 
 // 渲染不同风格的预览组件
-const ThemePreview = ({ theme }: { theme: any }) => {
+const ThemePreview = ({ theme }: { theme: Theme }) => {
   switch (theme.style) {
     case "tech":
       return (
-        <div className="bg-[#1e1e1e] rounded-xl p-4 font-mono text-xs text-green-400 shadow-inner border border-gray-800">
-          <div className="flex gap-1.5 mb-3">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
-            <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50" />
-            <div className="w-2.5 h-2.5 rounded-full bg-green-500/50" />
+        <div className="bg-white/10 rounded-2xl p-5 font-mono text-xs text-blue-50 shadow-inner border border-white/10 backdrop-blur-sm">
+          <div className="flex gap-1.5 mb-4">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-500/40" />
+            <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/40" />
+            <div className="w-2.5 h-2.5 rounded-full bg-green-500/40" />
           </div>
-          <div className="space-y-2 opacity-90">
-            {theme.preview.map((item: any, i: number) => (
-              <div key={i} className="flex gap-2">
-                <span className="text-gray-500 shrink-0">$</span>
+          <div className="space-y-2.5 opacity-90">
+            {theme.preview.map((item, i) => (
+              <div key={i} className="flex gap-3">
+                <span className="text-blue-300 shrink-0">$</span>
                 <span className="truncate">
                   <span className="text-white font-bold">{item.title}</span>
-                  <span className="text-gray-600 ml-2">--{item.meta}</span>
+                  <span className="text-white/90 ml-3">--{item.meta}</span>
                 </span>
               </div>
             ))}
-            <div className="animate-pulse">_</div>
+            <div className="animate-pulse text-blue-300">_</div>
           </div>
         </div>
       );
     case "finance":
       return (
-        <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm space-y-2">
-          {theme.preview.map((item: any, i: number) => (
-            <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-              <span className="font-bold text-gray-700 text-xs">{item.title}</span>
-              <span className={`text-xs font-mono font-bold ${item.trend === 'up' ? 'text-green-600' : 'text-red-500'}`}>
+        <div className="bg-white/10 rounded-2xl p-5 border border-white/10 shadow-inner backdrop-blur-sm space-y-2.5">
+          {theme.preview.map((item, i) => (
+            <div key={i} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+              <span className="font-bold text-white text-xs">{item.title}</span>
+              <span className={`text-xs font-mono font-black ${item.trend === 'up' ? 'text-green-400' : 'text-red-400'}`}>
                 {item.trend === 'up' ? '▲' : '▼'} {item.value}
               </span>
             </div>
@@ -273,15 +301,15 @@ const ThemePreview = ({ theme }: { theme: any }) => {
       );
     case "paper":
       return (
-        <div className="bg-[#fdfbf7] rounded-xl p-4 border border-[#eaddcf] shadow-sm font-serif">
-          <div className="border-b-2 border-black pb-2 mb-3">
-            <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">The Daily Brief</div>
+        <div className="bg-white/10 rounded-2xl p-5 border border-white/10 shadow-inner backdrop-blur-sm font-serif">
+          <div className="border-b border-white/10 pb-3 mb-4">
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/80">The Daily Brief</div>
           </div>
-          <div className="space-y-3">
-            {theme.preview.map((item: any, i: number) => (
+          <div className="space-y-4">
+            {theme.preview.map((item, i) => (
               <div key={i}>
-                <h4 className="font-bold text-gray-900 text-sm leading-tight mb-1">{item.title}</h4>
-                <p className="text-[10px] text-gray-500 leading-relaxed line-clamp-2">{item.snippet}</p>
+                <h4 className="font-bold text-white text-sm leading-tight mb-1.5">{item.title}</h4>
+                <p className="text-[10px] text-white/90 leading-relaxed line-clamp-2 italic">{item.snippet}</p>
               </div>
             ))}
           </div>
@@ -289,13 +317,13 @@ const ThemePreview = ({ theme }: { theme: any }) => {
       );
     case "chat":
       return (
-        <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-4 border border-white/50 shadow-sm space-y-3">
-          {theme.preview.map((item: any, i: number) => (
+        <div className="bg-white/10 rounded-2xl p-5 border border-white/10 shadow-inner backdrop-blur-sm space-y-4">
+          {theme.preview.map((item, i) => (
             <div key={i} className={`flex ${item.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] p-2.5 rounded-2xl text-[10px] leading-relaxed ${
+              <div className={`max-w-[85%] p-3 rounded-2xl text-[10px] font-medium leading-relaxed ${
                 item.role === 'user' 
-                  ? 'bg-blue-600 text-white rounded-br-none' 
-                  : 'bg-white text-gray-700 shadow-sm rounded-bl-none'
+                  ? 'bg-blue-600 text-white rounded-br-none shadow-lg shadow-blue-500/20' 
+                  : 'bg-white/5 text-white border border-white/10 rounded-bl-none'
               }`}>
                 {item.content}
               </div>
@@ -305,13 +333,13 @@ const ThemePreview = ({ theme }: { theme: any }) => {
       );
     case "card":
       return (
-        <div className="grid grid-cols-1 gap-2">
-          {theme.preview.map((item: any, i: number) => (
-            <div key={i} className="group/card relative overflow-hidden rounded-xl bg-gray-900 p-3 text-white">
-              <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-white/10 to-transparent blur-xl rounded-full -mr-8 -mt-8`} />
+        <div className="grid grid-cols-1 gap-2.5">
+          {theme.preview.map((item, i) => (
+            <div key={i} className="group/card relative overflow-hidden rounded-2xl bg-white/10 p-4 text-white border border-white/10 hover:border-blue-400/30 transition-all">
+              <div className={`absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/20 to-transparent blur-2xl rounded-full -mr-10 -mt-10`} />
               <div className="relative z-10 flex items-center justify-between">
-                <span className="font-bold text-xs truncate mr-2">{item.title}</span>
-                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${item.color} text-white`}>{item.tag}</span>
+                <span className="font-bold text-xs truncate mr-3 text-white">{item.title}</span>
+                <span className={`text-[9px] font-black px-2 py-0.5 rounded-lg ${item.color} text-white shadow-lg`}>{item.tag}</span>
               </div>
             </div>
           ))}
@@ -319,12 +347,12 @@ const ThemePreview = ({ theme }: { theme: any }) => {
       );
     case "minimal":
       return (
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.05)]">
-          <div className="space-y-4">
-            {theme.preview.map((item: any, i: number) => (
-              <div key={i} className="pl-3 border-l-2 border-gray-200">
-                <h4 className="font-bold text-gray-900 text-xs mb-0.5">{item.title}</h4>
-                <p className="text-[10px] text-gray-400 italic">{item.author}</p>
+        <div className="bg-white/10 rounded-2xl p-6 border border-white/10 shadow-inner backdrop-blur-sm">
+          <div className="space-y-5">
+            {theme.preview.map((item, i) => (
+              <div key={i} className="pl-4 border-l-2 border-white/20">
+                <h4 className="font-bold text-white text-xs mb-1 tracking-tight">{item.title}</h4>
+                <p className="text-[10px] text-white/90 italic font-medium">{item.author}</p>
               </div>
             ))}
           </div>
@@ -344,7 +372,8 @@ export default function Dashboard() {
   const [settings, setSettings] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [thanksLoading, setThanksLoading] = useState(false);
-  const [selectedTheme, setSelectedTheme] = useState<any>(null);
+  const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
+  const [subscribedThemeIds, setSubscribedThemeIds] = useState<string[]>([]);
 
   // 搜索和分类状态
   const [searchQuery, setSearchQuery] = useState("");
@@ -375,7 +404,14 @@ export default function Dashboard() {
         setUsername(authData.username);
 
         const config = await fetchCurrentConfig();
-        setSettings(config.settings || {});
+        // 将 rssSources 数组转换为字符串并合并到 settings 中
+        const settingsWithRss = {
+          ...(config.settings || {}),
+          rssUrls: config.rssSources ? config.rssSources.join("\n") : ""
+        };
+        setSettings(settingsWithRss);
+        // 初始化已订阅主题列表
+        setSubscribedThemeIds(config.settings?.subscribedThemes || []);
         // 初始化弹窗配置
         setModalConfig({
           webhookUrl: config.settings?.webhookUrl || "",
@@ -447,7 +483,7 @@ export default function Dashboard() {
     setNewSourceUrl("");
   };
 
-  const openSubscribeModal = (theme: any) => {
+  const openSubscribeModal = (theme: Theme) => {
     setSelectedTheme(theme);
     // 如果已有配置，使用现有配置；否则使用默认
     setModalConfig({
@@ -467,7 +503,7 @@ export default function Dashboard() {
     setLoading(true);
     try {
       // 1. 保存 RSS
-      const currentSources = settings.rssUrls ? settings.rssUrls.split("\n") : [];
+      const currentSources = settings.rssUrls ? settings.rssUrls.split("\n").filter(Boolean) : [];
       
       // 合并主题默认源和用户自定义添加的源
       const themeCustomSources = customThemeSources[selectedTheme.id] || [];
@@ -476,20 +512,28 @@ export default function Dashboard() {
       const newSources = Array.from(new Set([...currentSources, ...allThemeSources]));
       await persistRSS(newSources);
 
-      // 2. 保存设置 (Webhook & Schedule)
-      const newSettings = {
+      // 2. 保存设置 (Webhook & Schedule) - 不包含 rssUrls
+      const newSubscribedThemeIds = Array.from(new Set([...subscribedThemeIds, selectedTheme.id]));
+      const newSettingsForSave = {
         ...settings,
         webhookUrl: modalConfig.webhookUrl || settings.webhookUrl,
         pushTime: modalConfig.pushTime,
         pushDays: modalConfig.pushDays,
+        subscribedThemes: newSubscribedThemeIds, // 保存订阅的主题ID列表
         // 确保其他必要字段存在
         aiProvider: settings.aiProvider || "google",
         configMode: settings.configMode || "simple"
       };
-      await persistSettings(newSettings);
+      delete (newSettingsForSave as any).rssUrls; // 删除 rssUrls 避免存入 settings
+      await persistSettings(newSettingsForSave);
       
-      // 更新本地状态
+      // 3. 更新本地状态（包含 rssUrls 用于前端显示）
+      const newSettings = {
+        ...newSettingsForSave,
+        rssUrls: newSources.join("\n")
+      };
       setSettings(newSettings);
+      setSubscribedThemeIds(newSubscribedThemeIds);
       setIsModalOpen(false);
       alert(`🎉 订阅成功！已为您添加 [${selectedTheme.title}] 到订阅列表。`);
       
@@ -511,92 +555,89 @@ export default function Dashboard() {
     return matchesSearch && matchesCategory;
   });
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="w-12 h-12 animate-spin text-blue-600" /></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-transparent"><Loader2 className="w-12 h-12 animate-spin text-white" /></div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
+    <div className="min-h-screen text-white font-sans selection:bg-blue-500/30 selection:text-white overflow-x-hidden relative">
       {/* 顶部导航 */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 px-8 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push("/")}>
-          <div className="w-9 h-9 bg-black rounded-xl flex items-center justify-center shadow-md">
-            <span className="text-white font-serif italic text-base">W</span>
-          </div>
-          <span className="text-xl font-black tracking-tighter font-serif">Weave <span className="ml-2 text-gray-400 font-normal text-lg">RSS</span></span>
+      <header className="sticky top-0 z-50 bg-[#030712]/80 backdrop-blur-xl border-b border-white/10 supports-[backdrop-filter]:bg-[#030712]/60 px-8 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3 cursor-pointer group" onClick={() => router.push("/")}>
+          <span className="text-xl font-black tracking-tighter font-serif text-white drop-shadow-md">Weave</span>
         </div>
         <div className="flex items-center gap-6">
-          <nav className="hidden md:flex items-center bg-gray-100 p-1 rounded-xl">
-            <button onClick={() => setActiveTab('shelf')} className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'shelf' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'}`}>主题货架</button>
-            <button onClick={() => setActiveTab('active')} className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'active' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'}`}>已订阅</button>
-            <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'settings' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'}`}>个人中心</button>
+          <nav className="hidden md:flex items-center bg-white/10 p-1 rounded-2xl border border-white/10 backdrop-blur-sm">
+            <button onClick={() => setActiveTab('shelf')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'shelf' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>主题货架</button>
+            <button onClick={() => setActiveTab('active')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'active' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>已订阅</button>
+            <button onClick={() => setActiveTab('settings')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'settings' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>个人中心</button>
           </nav>
-          <div className="h-8 w-px bg-gray-200 mx-2" />
+          <div className="h-8 w-px bg-white/10 mx-2" />
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100">
-              <User className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-bold text-blue-700">{username}</span>
+            <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full border border-white/20 backdrop-blur-sm">
+              <User className="w-4 h-4 text-blue-200" />
+              <span className="text-sm font-bold text-white">{username}</span>
             </div>
-            <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); router.push("/"); }} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
+            <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); router.push("/"); }} className="p-2.5 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all">
               <LogOut className="w-5 h-5" />
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-8 lg:p-12">
+      <main className="max-w-7xl mx-auto p-8 lg:p-12 relative z-10">
 
         <AnimatePresence>
           {isModalOpen && selectedTheme && (
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
               onClick={() => setIsModalOpen(false)}
             >
               <motion.div
                 initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden"
+                className="bg-white border border-white/10 rounded-[40px] w-full max-w-lg shadow-2xl overflow-hidden ring-1 ring-white/5"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="p-8 space-y-6">
+                <div className="p-10 space-y-8">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-gray-50 rounded-2xl text-gray-900">
+                    <div className="flex items-center gap-4">
+                      <div className="p-4 bg-white/10 rounded-2xl text-blue-600 border border-white/10">
                         {selectedTheme.icon}
                       </div>
                       <div>
-                        <h3 className="text-xl font-black text-gray-900">订阅配置</h3>
-                        <p className="text-xs text-gray-500 font-bold mt-0.5">主题：{selectedTheme.title}</p>
+                        <h3 className="text-2xl font-black text-blue-950">订阅配置</h3>
+                        <p className="text-xs text-blue-900/40 font-bold mt-1 uppercase tracking-widest">主题：{selectedTheme.title}</p>
                       </div>
                     </div>
-                    <button onClick={() => setIsModalOpen(false)} className="p-2 bg-gray-50 rounded-full hover:bg-gray-100 transition-colors">
-                      <X className="w-5 h-5 text-gray-500" />
+                    <button onClick={() => setIsModalOpen(false)} className="p-3 bg-white/5 rounded-full hover:bg-white/10 transition-colors border border-white/10">
+                      <X className="w-5 h-5 text-blue-900/30" />
                     </button>
                   </div>
 
-                  <div className="space-y-6">
+                  <div className="space-y-8">
                     {/* Webhook 配置 (仅当未配置时显示) */}
                     {!settings.webhookUrl && (
-                      <div className="space-y-2">
-                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Webhook 地址 (必填)</label>
+                      <div className="space-y-3">
+                        <label className="text-xs font-black text-blue-900/30 uppercase tracking-widest ml-1 block">Webhook 地址 (必填)</label>
                         <input 
                           type="text" 
                           value={modalConfig.webhookUrl}
                           onChange={(e) => setModalConfig(prev => ({ ...prev, webhookUrl: e.target.value }))}
                           placeholder="请输入机器人 Webhook 地址"
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all font-sans"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-blue-900/20"
                         />
-                        <p className="text-[10px] text-gray-400 ml-1">首次订阅需配置接收地址，后续可直接复用。</p>
+                        <p className="text-[10px] text-blue-900/20 ml-1 font-medium">首次订阅需配置接收地址，后续可直接复用。</p>
                       </div>
                     )}
 
                     {/* 推送时间 */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">每日推送时间</label>
+                    <div className="space-y-3">
+                      <label className="text-xs font-black text-blue-900/20 uppercase tracking-widest ml-1 block">每日推送时间</label>
                       <div className="grid grid-cols-6 gap-2">
                         {Array.from({ length: 24 }).map((_, i) => (
                           <button 
                             key={i} 
                             onClick={() => setModalConfig(prev => ({ ...prev, pushTime: i.toString() }))} 
-                            className={`py-2 text-xs font-bold rounded-lg border transition-all ${modalConfig.pushTime === i.toString() ? "bg-blue-600 text-white border-blue-600 shadow-md scale-105" : "bg-gray-50 text-gray-400 border-gray-100 hover:border-gray-200"}`}
+                            className={`py-2.5 text-xs font-bold rounded-xl border transition-all ${modalConfig.pushTime === i.toString() ? "bg-blue-950 text-white shadow-lg scale-105" : "bg-white/5 text-blue-900/30 border-white/10 hover:border-white/20 hover:bg-white/10"}`}
                           >
                             {i}:00
                           </button>
@@ -605,8 +646,8 @@ export default function Dashboard() {
                     </div>
 
                     {/* 推送周期 */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">推送周期</label>
+                    <div className="space-y-3">
+                      <label className="text-xs font-black text-blue-900/20 uppercase tracking-widest ml-1 block">推送周期</label>
                       <div className="flex flex-wrap gap-2">
                         {[{ label: "周一", val: 1 }, { label: "周二", val: 2 }, { label: "周三", val: 3 }, { label: "周四", val: 4 }, { label: "周五", val: 5 }, { label: "周六", val: 6 }, { label: "周日", val: 0 }].map((day) => (
                           <button 
@@ -615,7 +656,7 @@ export default function Dashboard() {
                               const newDays = modalConfig.pushDays.includes(day.val) ? modalConfig.pushDays.filter(d => d !== day.val) : [...modalConfig.pushDays, day.val]; 
                               setModalConfig(prev => ({ ...prev, pushDays: newDays })); 
                             }} 
-                            className={`px-3 py-2 text-xs font-bold rounded-lg border transition-all ${modalConfig.pushDays.includes(day.val) ? "bg-purple-600 text-white border-purple-600" : "bg-gray-50 text-gray-400 border-gray-100 hover:border-gray-200"}`}
+                            className={`px-4 py-2.5 text-xs font-bold rounded-xl border transition-all ${modalConfig.pushDays.includes(day.val) ? "bg-blue-600/10 text-blue-600 border-blue-500/20 shadow-lg shadow-blue-900/5" : "bg-white/5 text-blue-900/20 border-white/10 hover:border-white/20"}`}
                           >
                             {day.label}
                           </button>
@@ -627,9 +668,14 @@ export default function Dashboard() {
                   <button 
                     onClick={handleConfirmSubscription}
                     disabled={loading}
-                    className="w-full py-4 bg-black text-white rounded-2xl font-black text-lg hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-black/10 flex items-center justify-center gap-2"
+                    className="w-full py-5 bg-blue-950 text-white rounded-[24px] font-black text-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-blue-950/10 flex items-center justify-center gap-3 disabled:bg-gray-100 disabled:text-gray-400"
                   >
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "确认订阅"}
+                    {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (
+                      <>
+                        <CheckCircle2 className="w-6 h-6" />
+                        确认订阅
+                      </>
+                    )}
                   </button>
                 </div>
               </motion.div>
@@ -639,39 +685,39 @@ export default function Dashboard() {
           {isAddSourceModalOpen && (
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+              className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
               onClick={() => setIsAddSourceModalOpen(false)}
             >
               <motion.div
                 initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden"
+                className="bg-white border border-white/10 rounded-[40px] w-full max-w-md shadow-2xl overflow-hidden ring-1 ring-white/5"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="p-8 space-y-6">
+                <div className="p-10 space-y-8">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-black text-gray-900">添加 RSS 源</h3>
-                    <button onClick={() => setIsAddSourceModalOpen(false)} className="p-2 bg-gray-50 rounded-full hover:bg-gray-100 transition-colors">
-                      <X className="w-5 h-5 text-gray-500" />
+                    <h3 className="text-2xl font-black text-blue-950 uppercase tracking-tighter">添加 RSS 源</h3>
+                    <button onClick={() => setIsAddSourceModalOpen(false)} className="p-3 bg-white/5 rounded-full hover:bg-white/10 transition-colors border border-white/10">
+                      <X className="w-5 h-5 text-blue-900/30" />
                     </button>
                   </div>
                   
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">RSS 链接</label>
+                  <div className="space-y-3">
+                    <label className="text-xs font-black text-blue-900/30 uppercase tracking-widest ml-1 block">RSS 链接</label>
                     <input 
                       type="text" 
                       value={newSourceUrl}
                       onChange={(e) => setNewSourceUrl(e.target.value)}
                       placeholder="https://example.com/feed.xml"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all font-sans"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-blue-900/20"
                     />
                   </div>
 
                   <button 
                     onClick={handleAddSource}
                     disabled={!newSourceUrl.trim()}
-                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-lg hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:shadow-none"
+                    className="w-full py-5 bg-blue-600 text-white rounded-[24px] font-black text-xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-3 disabled:bg-gray-100 disabled:shadow-none disabled:text-gray-400"
                   >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-6 h-6" />
                     确认添加
                   </button>
                 </div>
@@ -684,22 +730,22 @@ export default function Dashboard() {
           {activeTab === 'shelf' && (
             <motion.div 
               key="shelf" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-              className="space-y-8"
+              className="space-y-12"
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-3xl font-black tracking-tight">选择你关注的主题</h2>
+                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">选择你关注的主题</h2>
               </div>
 
               {/* 搜索和分类栏 */}
-              <div className="space-y-6 bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm">
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-400" />
+              <div className="space-y-8 bg-white/10 p-8 rounded-[40px] border border-white/10 backdrop-blur-md shadow-2xl ring-1 ring-white/5">
+                <div className="relative group">
+                  <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-7 h-7 text-white/40 group-focus-within:text-white transition-colors" />
                   <input 
                     type="text" 
                     placeholder="搜索感兴趣的主题（如：AI、设计、财经...）" 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-6 py-5 text-base outline-none focus:ring-2 focus:ring-blue-600 transition-all font-medium"
+                    className="w-full bg-white/10 border border-white/10 rounded-[24px] pl-16 pr-8 py-6 text-lg outline-none focus:ring-2 focus:ring-blue-400 transition-all font-medium text-white placeholder:text-white/20"
                   />
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -707,10 +753,10 @@ export default function Dashboard() {
                     <button
                       key={cat.id}
                       onClick={() => setSelectedCategory(cat.id)}
-                      className={`px-5 py-2.5 rounded-full text-sm font-bold transition-all ${
+                      className={`px-6 py-3 rounded-full text-sm font-bold transition-all ${
                         selectedCategory === cat.id 
-                          ? "bg-black text-white shadow-lg shadow-gray-200 scale-105" 
-                          : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                          ? "bg-white text-blue-950 shadow-[0_0_20px_rgba(255,255,255,0.2)] scale-105" 
+                          : "bg-white/5 text-white/50 border border-white/5 hover:bg-white/10 hover:border-white/10 hover:text-white"
                       }`}
                     >
                       {cat.label}
@@ -720,85 +766,82 @@ export default function Dashboard() {
               </div>
 
               <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
-                {filteredThemes.map((theme) => (
-                  <div 
+                {filteredThemes.map((theme, index) => (
+                  <motion.div 
                     key={theme.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.05 }}
                     className="break-inside-avoid group relative flex flex-col"
                   >
-                    <div className="relative bg-white rounded-[32px] p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                    <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-blue-400/30 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5">
                       {/* 头部信息 */}
-                      <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2.5 bg-gray-50 rounded-xl text-gray-900 group-hover:bg-black group-hover:text-white transition-colors">
+                      <div className="flex items-center justify-between mb-8">
+                        <div className="flex items-center gap-4">
+                          <div className={`p-3.5 bg-white/10 rounded-2xl text-blue-300 border border-white/10 group-hover:bg-white group-hover:text-blue-950 transition-all duration-500`}>
                             {theme.icon}
                           </div>
-                          <h3 className="text-lg font-black text-gray-900">{theme.title}</h3>
+                          <h3 className="text-xl font-black text-white font-serif">{theme.title}</h3>
                         </div>
                         <button 
                           onClick={() => openSubscribeModal(theme)}
-                          className="px-4 py-2 bg-gray-900 text-white text-xs font-bold rounded-full opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0"
+                          className="px-5 py-2.5 bg-white text-blue-950 text-sm font-bold rounded-full opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0 shadow-lg hover:scale-105"
                         >
                           订阅
                         </button>
                       </div>
 
                       {/* 差异化预览组件 */}
-                      <div className="mb-6">
+                      <div className="mb-8">
                         <ThemePreview theme={theme} />
                       </div>
 
-                      <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                      <p className="text-sm text-blue-100/80 font-medium leading-relaxed">
                         {theme.desc}
                       </p>
 
-                      <div className="mt-5 pt-5 border-t border-gray-100/50">
-                        <div className="flex items-center justify-between mb-3">
+                      <div className="mt-8 pt-8 border-t border-white/10">
+                        <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-2">
-                            <Rss className="w-3 h-3 text-gray-400" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">包含 {theme.sources.length + (customThemeSources[theme.id]?.length || 0)} 个信源</span>
+                            <Rss className="w-4 h-4 text-blue-100/50" />
+                            <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">包含 {theme.sources.length + (customThemeSources[theme.id]?.length || 0)} 个信源</span>
                           </div>
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();
                               openAddSourceModal(theme.id);
                             }}
-                            className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors"
+                            className="flex items-center gap-1.5 text-[10px] font-black text-blue-300 hover:text-blue-200 bg-blue-500/20 px-3 py-1.5 rounded-xl transition-colors uppercase tracking-widest"
                           >
-                            <Plus className="w-3 h-3" />
+                            <Plus className="w-3.5 h-3.5" />
                             添加源
                           </button>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          {theme.sources.map((source: string, idx: number) => (
-                            <div key={idx} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-lg border border-gray-100/80 text-[10px] text-gray-500 font-medium transition-colors hover:bg-gray-100 hover:text-gray-700">
-                              <div className={`w-1 h-1 rounded-full bg-gradient-to-br ${theme.color}`} />
-                              <span className="truncate max-w-[140px]">{source.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}</span>
-                            </div>
-                          ))}
-                          {customThemeSources[theme.id]?.map((source: string, idx: number) => (
-                            <div key={`custom-${idx}`} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 rounded-lg border border-blue-100/80 text-[10px] text-blue-600 font-medium transition-colors hover:bg-blue-100">
-                              <div className="w-1 h-1 rounded-full bg-blue-500" />
-                              <span className="truncate max-w-[140px]">{source.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}</span>
+                        <div className="flex flex-wrap gap-2.5">
+                          {theme.sources.slice(0, 3).map((source: string, idx: number) => (
+                            <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-xl border border-white/5 text-[10px] text-blue-100/70 font-bold transition-all hover:bg-white/10 hover:text-white">
+                              <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-br ${theme.color}`} />
+                              <span className="truncate max-w-[120px] uppercase tracking-wider">{source.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}</span>
                             </div>
                           ))}
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
                 
                 {/* 自由配置入口 */}
                 <div 
                   onClick={() => router.push("/config")}
-                  className="break-inside-avoid cursor-pointer"
+                  className="break-inside-avoid cursor-pointer group"
                 >
-                  <div className="relative bg-gray-50 rounded-[32px] p-6 border-2 border-dashed border-gray-200 hover:border-blue-500 hover:bg-blue-50/30 transition-all duration-300 flex flex-col items-center justify-center text-center h-[200px] space-y-4">
-                    <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-gray-400 group-hover:text-blue-600">
-                      <Plus className="w-6 h-6" />
+                  <div className="relative bg-white/5 rounded-[40px] p-8 border-2 border-dashed border-white/10 hover:border-blue-400/50 hover:bg-blue-500/10 transition-all duration-500 flex flex-col items-center justify-center text-center h-[280px] space-y-6 backdrop-blur-md">
+                    <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 shadow-lg flex items-center justify-center text-white/60 group-hover:text-blue-300 group-hover:scale-110 transition-all duration-500">
+                      <Plus className="w-8 h-8" />
                     </div>
                     <div>
-                      <h3 className="text-base font-black text-gray-900">自由配置模式</h3>
-                      <p className="text-[10px] text-gray-400 mt-1">自定义您的专属情报流</p>
+                      <h3 className="text-xl font-black text-white font-serif italic">自由配置模式</h3>
+                      <p className="text-sm text-blue-100/50 mt-2 font-bold uppercase tracking-widest">自定义您的专属情报流</p>
                     </div>
                   </div>
                 </div>
@@ -809,37 +852,123 @@ export default function Dashboard() {
           {activeTab === 'active' && (
             <motion.div 
               key="active" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-              className="space-y-8"
+              className="space-y-12"
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-3xl font-black tracking-tight">已订阅主题</h2>
-                <button onClick={() => router.push("/config")} className="flex items-center gap-2 text-blue-600 font-bold hover:underline">
-                  管理所有配置 <Settings2 className="w-4 h-4" />
+                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">已订阅主题</h2>
+                <button onClick={() => router.push("/config")} className="flex items-center gap-3 text-blue-600 font-black text-sm uppercase tracking-[0.2em] hover:text-blue-700 transition-colors group">
+                  新增自定义配置 <Settings2 className="w-5 h-5 group-hover:rotate-90 transition-transform duration-500" />
                 </button>
               </div>
 
-              {settings.rssUrls ? (
-                <div className="bg-white rounded-[32px] border-2 border-gray-100 p-8 shadow-sm">
-                  <div className="flex items-center gap-4 mb-8">
-                    <div className="p-3 bg-green-50 rounded-2xl text-green-600"><CheckCircle2 className="w-6 h-6" /></div>
-                    <div>
-                      <h3 className="text-xl font-black">当前订阅流已激活</h3>
-                      <p className="text-sm text-gray-400 font-medium">包含 {settings.rssUrls.split('\n').filter(Boolean).length} 个活跃信源</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {settings.rssUrls.split('\n').filter(Boolean).map((url: string, i: number) => (
-                      <div key={url} className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                        <div className="w-2 h-2 rounded-full bg-blue-500" />
-                        <span className="text-sm font-medium text-gray-600 truncate">{url}</span>
+              {subscribedThemeIds.length > 0 || settings.rssUrls ? (
+                <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
+                  {/* 已订阅主题卡片 */}
+                  {subscribedThemeIds.map((themeId) => {
+                    const theme = PRESET_THEMES.find(t => t.id === themeId);
+                    if (!theme) return null;
+                    
+                    const themeCustomSources = customThemeSources[themeId] || [];
+                    const allSources = [...theme.sources, ...themeCustomSources];
+                    
+                    return (
+                      <div 
+                        key={themeId}
+                        className="break-inside-avoid group relative flex flex-col"
+                      >
+                        <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-blue-500/20 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5">
+                          {/* 已订阅标签 */}
+                          <div className="absolute top-6 right-6 px-4 py-1.5 bg-green-500/20 text-green-300 text-[10px] font-black rounded-full border border-green-500/30 uppercase tracking-widest">
+                            已订阅
+                          </div>
+                          
+                          {/* 头部信息 */}
+                          <div className="flex items-center gap-4 mb-8">
+                            <div className="p-3.5 bg-white/10 rounded-2xl text-blue-600 border border-white/10 group-hover:bg-white group-hover:text-blue-950 transition-all duration-500">
+                              {theme.icon}
+                            </div>
+                            <h3 className="text-xl font-black text-white font-serif">{theme.title}</h3>
+                          </div>
+
+                          {/* 差异化预览组件 */}
+                          <div className="mb-8">
+                            <ThemePreview theme={theme} />
+                          </div>
+
+                          <p className="text-sm text-blue-100/80 font-medium leading-relaxed">
+                            {theme.desc}
+                          </p>
+
+                          <div className="mt-8 pt-8 border-t border-white/10">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-2">
+                                <Rss className="w-4 h-4 text-blue-100/50" />
+                                <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">包含 {allSources.length} 个信源</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2.5">
+                              {theme.sources.slice(0, 3).map((source: string, idx: number) => (
+                                <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-xl border border-white/5 text-[10px] text-blue-100/70 font-bold">
+                                  <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-br ${theme.color}`} />
+                                  <span className="truncate max-w-[120px] uppercase tracking-wider">{source.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
+                  
+                  {/* 自定义 RSS 源（不属于任何主题的） */}
+                  {(() => {
+                    const allThemesSources = subscribedThemeIds.flatMap(id => {
+                      const theme = PRESET_THEMES.find(t => t.id === id);
+                      if (!theme) return [];
+                      return [...theme.sources, ...(customThemeSources[id] || [])];
+                    });
+                    const customRssSources = settings.rssUrls
+                      ? settings.rssUrls.split('\n').filter((url: string) => url && !allThemesSources.includes(url))
+                      : [];
+                    
+                    if (customRssSources.length === 0) return null;
+                    
+                    return (
+                      <div className="break-inside-avoid relative flex flex-col">
+                        <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-white/30 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5">
+                          <div className="flex items-center gap-4 mb-8">
+                            <div className="p-3.5 bg-white/10 rounded-2xl text-blue-300 border border-white/10 group-hover:bg-white group-hover:text-blue-950 transition-all duration-500">
+                              <Plus className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h3 className="text-xl font-black text-white font-serif">自定义源</h3>
+                              <p className="text-xs text-blue-100/60 font-bold uppercase tracking-widest mt-1">{customRssSources.length} 个信源</p>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            {customRssSources.slice(0, 5).map((url: string, idx: number) => (
+                              <div key={idx} className="flex items-center gap-3 px-4 py-3 bg-white/5 rounded-2xl border border-white/5 text-[11px] text-blue-100/70 font-medium">
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-400/50" />
+                                <span className="truncate">{url}</span>
+                              </div>
+                            ))}
+                            {customRssSources.length > 5 && (
+                              <p className="text-[10px] text-blue-100/50 font-black uppercase tracking-widest text-center pt-2">还有 {customRssSources.length - 5} 个更多源...</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : (
-                <div className="text-center py-20 bg-white rounded-[40px] border-2 border-dashed border-gray-100">
-                  <p className="text-gray-400 font-medium mb-6">您还没有订阅任何主题</p>
-                  <button onClick={() => setActiveTab('shelf')} className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-600/20 hover:scale-105 transition-all">去主题货架看看</button>
+                <div className="text-center py-32 bg-white/5 rounded-[50px] border-2 border-dashed border-white/10 backdrop-blur-md">
+                  <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-8 border border-white/10">
+                    <Rss className="w-10 h-10 text-blue-200/20" />
+                  </div>
+                  <p className="text-blue-200/70 font-bold text-xl mb-10 uppercase tracking-[0.2em]">您还没有订阅任何主题</p>
+                  <button onClick={() => setActiveTab('shelf')} className="px-12 py-5 bg-white text-blue-950 rounded-[24px] font-black text-xl shadow-2xl shadow-white/5 hover:scale-105 transition-all">去主题货架看看</button>
                 </div>
               )}
             </motion.div>
@@ -848,105 +977,107 @@ export default function Dashboard() {
           {activeTab === 'settings' && (
             <motion.div 
               key="settings" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-              className="max-w-3xl mx-auto space-y-8"
+              className="max-w-3xl mx-auto space-y-12"
             >
-              <h2 className="text-3xl font-black tracking-tight">个人中心</h2>
+              <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">个人中心</h2>
               
-              <form onSubmit={handleSaveSettings} className="space-y-8">
+              <form onSubmit={handleSaveSettings} className="space-y-10">
                 {/* Webhook 配置 */}
-                <div className="bg-white rounded-[32px] border-2 border-gray-100 p-8 shadow-sm space-y-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-blue-50 rounded-2xl text-blue-600"><Bell className="w-6 h-6" /></div>
-                    <h3 className="text-xl font-black">推送设置</h3>
+                <div className="bg-white/10 rounded-[40px] border border-white/10 p-10 shadow-2xl backdrop-blur-md ring-1 ring-white/5 space-y-8">
+                  <div className="flex items-center gap-5">
+                    <div className="p-4 bg-white/10 rounded-2xl text-blue-300 border border-white/10"><Bell className="w-7 h-7" /></div>
+                    <h3 className="text-2xl font-black text-white font-serif">推送设置</h3>
                   </div>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">Webhook 地址</label>
+                      <label className="text-xs font-black text-white uppercase tracking-widest ml-1 mb-3 block">Webhook 地址</label>
                       <input 
                         type="text" 
                         value={settings.webhookUrl || ""} 
                         onChange={(e) => setSettings({...settings, webhookUrl: e.target.value})}
                         placeholder="请输入机器人 Webhook 地址"
-                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all font-sans"
+                        className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-base outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/30"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* API 状态 */}
-                <div className="bg-white rounded-[32px] border-2 border-gray-100 p-8 shadow-sm space-y-6">
+                <div className="bg-white/10 rounded-[40px] border border-white/10 p-10 shadow-2xl backdrop-blur-md ring-1 ring-white/5 space-y-8">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-purple-50 rounded-2xl text-purple-600"><Zap className="w-6 h-6" /></div>
-                      <h3 className="text-xl font-black">AI 引擎配置</h3>
+                    <div className="flex items-center gap-5">
+                      <div className="p-4 bg-white/10 rounded-2xl text-blue-300 border border-white/10"><Zap className="w-7 h-7" /></div>
+                      <h3 className="text-2xl font-black text-white font-serif">AI 引擎配置</h3>
                     </div>
                     {(!settings.geminiApiKey && !settings.openaiApiKey) && (
                       <button 
                         type="button"
                         onClick={handleThanks} disabled={thanksLoading}
-                        className="px-4 py-2 bg-orange-50 text-orange-600 rounded-xl font-bold text-xs hover:bg-orange-100 transition-all flex items-center gap-2"
+                        className="px-5 py-2.5 bg-blue-500/20 text-blue-300 rounded-xl font-black text-[10px] hover:bg-blue-500/30 transition-all flex items-center gap-2 border border-blue-500/30 uppercase tracking-widest"
                       >
-                        {thanksLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Heart className="w-3 h-3 fill-current" />}
+                        {thanksLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Heart className="w-3.5 h-3.5 fill-current" />}
                         使用免费 API (感谢阿旭)
                       </button>
                     )}
                   </div>
                   
-                  <div className="space-y-4">
-                    <div className="flex bg-gray-50 p-1 rounded-xl">
-                      <button type="button" onClick={() => setSettings({...settings, aiProvider: 'google'})} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${settings.aiProvider === 'google' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}>Google Gemini</button>
-                      <button type="button" onClick={() => setSettings({...settings, aiProvider: 'openai'})} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${settings.aiProvider === 'openai' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}>OpenAI / 兼容平台</button>
+                  <div className="space-y-6">
+                    <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/5">
+                      <button type="button" onClick={() => setSettings({...settings, aiProvider: 'google'})} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${settings.aiProvider === 'google' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/40 hover:text-white'}`}>Google Gemini</button>
+                      <button type="button" onClick={() => setSettings({...settings, aiProvider: 'openai'})} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${settings.aiProvider === 'openai' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/40 hover:text-white'}`}>OpenAI / 兼容平台</button>
                     </div>
 
                     {settings.aiProvider === 'google' ? (
-                      <div>
-                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">Gemini API Key</label>
+                      <div className="animate-in fade-in duration-500">
+                        <label className="text-xs font-black text-white uppercase tracking-widest ml-1 mb-3 block">Gemini API Key</label>
                         <input 
                           type="password" 
                           value={settings.geminiApiKey || ""} 
                           onChange={(e) => setSettings({...settings, geminiApiKey: e.target.value})}
                           placeholder="留空则使用免费额度"
-                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all font-sans"
+                          className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-base outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/30"
                         />
                       </div>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="space-y-6 animate-in fade-in duration-500">
                         <div>
-                          <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">OpenAI API Key</label>
+                          <label className="text-xs font-black text-white uppercase tracking-widest ml-1 mb-3 block">OpenAI API Key</label>
                           <input 
                             type="password" 
                             value={settings.openaiApiKey || ""} 
                             onChange={(e) => setSettings({...settings, openaiApiKey: e.target.value})}
-                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all font-sans"
+                            className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-base outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white"
                           />
                         </div>
-                        <div>
-                          <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">Base URL (可选)</label>
-                          <input 
-                            type="text" 
-                            value={settings.openaiBaseUrl || ""} 
-                            onChange={(e) => setSettings({...settings, openaiBaseUrl: e.target.value})}
-                            placeholder="https://api.openai.com/v1"
-                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all font-sans"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">Model Name</label>
-                          <input 
-                            type="text" 
-                            value={settings.openaiModel || ""} 
-                            onChange={(e) => setSettings({...settings, openaiModel: e.target.value})}
-                            placeholder="gpt-4o"
-                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all font-sans"
-                          />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <label className="text-xs font-black text-white uppercase tracking-widest ml-1 mb-3 block">Base URL (可选)</label>
+                            <input 
+                              type="text" 
+                              value={settings.openaiBaseUrl || ""} 
+                              onChange={(e) => setSettings({...settings, openaiBaseUrl: e.target.value})}
+                              placeholder="https://api.openai.com/v1"
+                              className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/30"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-black text-white uppercase tracking-widest ml-1 mb-3 block">Model Name</label>
+                            <input 
+                              type="text" 
+                              value={settings.openaiModel || ""} 
+                              onChange={(e) => setSettings({...settings, openaiModel: e.target.value})}
+                              placeholder="gpt-4o"
+                              className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/30"
+                            />
+                          </div>
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="pt-4">
-                  <button type="submit" className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-blue-600 transition-all shadow-lg shadow-gray-200">
+                <div className="pt-6">
+                  <button type="submit" className="w-full py-6 bg-white text-blue-950 rounded-[24px] font-black text-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)]">
                     保存设置
                   </button>
                 </div>
