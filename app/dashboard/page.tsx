@@ -372,7 +372,7 @@ export default function Dashboard() {
   const [settings, setSettings] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [thanksLoading, setThanksLoading] = useState(false);
-  const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
+  const [selectedTheme, setSelectedTheme] = useState<any>(null);
   const [subscribedThemeIds, setSubscribedThemeIds] = useState<string[]>([]);
 
   // 搜索和分类状态
@@ -483,7 +483,7 @@ export default function Dashboard() {
     setNewSourceUrl("");
   };
 
-  const openSubscribeModal = (theme: Theme) => {
+  const openSubscribeModal = (theme: any) => {
     setSelectedTheme(theme);
     // 如果已有配置，使用现有配置；否则使用默认
     setModalConfig({
