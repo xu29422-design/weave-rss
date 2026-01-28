@@ -495,6 +495,8 @@ export default function Dashboard() {
   };
 
   const handleConfirmSubscription = async () => {
+    if (!selectedTheme) return; // Add guard for selectedTheme
+
     if (!modalConfig.webhookUrl && !settings.webhookUrl) {
       alert("请填写 Webhook 地址以接收推送");
       return;
