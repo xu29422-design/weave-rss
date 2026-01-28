@@ -10,7 +10,7 @@ import {
   Link2, Settings2, LogOut, User, Play, Edit3, ChevronRight, Clock, Calendar, Zap, LayoutDashboard,
   MessageSquare, Send, Plus, Check, Info
 } from "lucide-react";
-import { CpuIcon, GlobeIcon, RssIcon, WebhookIcon } from "@/components/AnimatedIcons";
+import { motion } from "framer-motion";
 
 type ConfigModule = 'basic' | 'rss' | 'prompts';
 
