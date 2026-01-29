@@ -981,9 +981,17 @@ export default function Dashboard() {
               key="settings" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
               className="max-w-3xl mx-auto space-y-12"
             >
-              <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">个人中心</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">个人中心</h2>
+                <button 
+                  onClick={() => document.getElementById('settings-form')?.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }))}
+                  className="px-8 py-3 bg-white text-blue-950 rounded-full font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-white/10"
+                >
+                  保存设置
+                </button>
+              </div>
               
-              <form onSubmit={handleSaveSettings} className="space-y-10">
+              <form id="settings-form" onSubmit={handleSaveSettings} className="space-y-10">
                 {/* Webhook 配置 */}
                 <div className="bg-white/10 rounded-[40px] border border-white/10 p-10 shadow-2xl backdrop-blur-md ring-1 ring-white/5 space-y-8">
                   <div className="flex items-center gap-5">
@@ -1078,11 +1086,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="pt-6">
-                  <button type="submit" className="w-full py-6 bg-white text-blue-950 rounded-[24px] font-black text-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)]">
-                    保存设置
-                  </button>
-                </div>
+                {/* 底部按钮移除，已移至顶部 */}
               </form>
             </motion.div>
           )}
