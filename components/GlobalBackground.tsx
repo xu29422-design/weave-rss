@@ -142,9 +142,10 @@ export default function GlobalBackground() {
     const renderer = new THREE.WebGLRenderer({ 
       antialias: false, // Disable antialias for performance
       alpha: false,
-      powerPreference: "high-performance"
+      powerPreference: "high-performance",
+      precision: "mediump" // Use medium precision for better performance
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Cap pixel ratio at 1.5
+    renderer.setPixelRatio(1.0); // Limit pixel ratio to 1.0 for maximum performance
     renderer.setSize(window.innerWidth, window.innerHeight);
     containerRef.current.appendChild(renderer.domElement);
 

@@ -105,12 +105,13 @@ export default function EnterPage() {
     camera.position.z = 1000;
 
     const renderer = new THREE.WebGLRenderer({ 
-      antialias: true, 
+      antialias: false, // Disable antialias for performance
       powerPreference: "high-performance",
-      alpha: false 
+      alpha: false,
+      precision: "mediump" // Use medium precision
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(1.0); // Limit pixel ratio to 1.0
     mountRef.current.appendChild(renderer.domElement);
 
     // 2. Create Clouds
