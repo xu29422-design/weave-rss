@@ -563,7 +563,7 @@ export default function Dashboard() {
     <div className="min-h-screen text-white font-sans selection:bg-blue-500/30 selection:text-white overflow-x-hidden relative">
       {/* 顶部导航 */}
       <header className="sticky top-0 z-50 bg-[#030712]/80 backdrop-blur-xl border-b border-white/10 supports-[backdrop-filter]:bg-[#030712]/60 px-8 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3 cursor-pointer group" onClick={() => router.push("/")}>
+        <div className="flex items-center gap-3 cursor-pointer group" onClick={() => router.push("/home")}>
           <span className="text-xl font-black tracking-tighter font-serif text-white drop-shadow-md">Weave</span>
         </div>
         <div className="flex items-center gap-6">
@@ -1053,7 +1053,7 @@ export default function Dashboard() {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
-                            <label className="text-xs font-black text-white uppercase tracking-widest ml-1 mb-3 block">Base URL (可选)</label>
+                            <label className="text-xs font-black text-white uppercase tracking-widest ml-1 mb-3 block">Base URL</label>
                             <input 
                               type="text" 
                               value={settings.openaiBaseUrl || ""} 
