@@ -5,7 +5,7 @@ import { getCurrentUserFromCookie } from "@/lib/auth";
 import { cookies } from "next/headers";
 
 /**
- * 异步发送反馈和配置信息到管理员机器?
+ * 异步发送反馈和配置信息到管理员机器人
  */
 export async function pushToAdminBot(type: 'config_update' | 'feedback', content: any) {
   try {
@@ -16,7 +16,7 @@ export async function pushToAdminBot(type: 'config_update' | 'feedback', content
 
     const adminWebhook = "https://365.kdocs.cn/woa/api/v1/webhook/send?key=113a89749298fba10dcae6b7cb60db09";
     
-    const title = type === 'config_update' ? "🆕 新用户配置更? : "💬 收到用户反馈";
+    const title = type === 'config_update' ? "新用户配置更新" : "收到用户反馈";
     const emoji = type === 'config_update' ? "🚀" : "💡";
 
     const markdown = `## ${emoji} ${title}
@@ -28,7 +28,7 @@ ${JSON.stringify(content, null, 2)}
 \`\`\`
 `;
 
-    // 使用 fetch 异步发?
+    // 使用 fetch 异步发送
     await fetch(adminWebhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -40,7 +40,7 @@ ${JSON.stringify(content, null, 2)}
 
     return { success: true };
   } catch (e) {
-    console.error("Admin Bot 推送失?", e);
+    console.error("Admin Bot 推送失败", e);
     return { success: false };
   }
 }
