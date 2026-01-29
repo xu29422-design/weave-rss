@@ -85,9 +85,6 @@ function AuthContent() {
         </button>
 
         <div className="text-center space-y-4 mb-10">
-          <div className="mx-auto w-fit px-8 py-2.5 bg-white/10 border border-white/20 text-white rounded-2xl flex items-center justify-center font-black text-xl italic font-serif shadow-2xl shadow-blue-500/20 backdrop-blur-md">
-            Weave
-          </div>
           <h1 className="text-3xl font-black text-white tracking-tight uppercase leading-none font-serif italic drop-shadow-lg">
             {mode === "login" ? "登录" : "注册"}
           </h1>
@@ -190,7 +187,7 @@ function AuthContent() {
               setMode(mode === "login" ? "register" : "login");
               setError("");
             }}
-            className="px-6 py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-white uppercase tracking-[0.2em] hover:bg-white/10 hover:border-white/20 transition-all shadow-lg"
+            className="px-6 py-3 bg-white/5 border border-white/10 rounded-full text-[10px] font-black text-white uppercase tracking-[0.2em] hover:bg-white/10 hover:border-white/20 transition-all shadow-lg"
           >
             {mode === "login" ? "没有账号？注册" : "已有账号？登录"}
           </button>
