@@ -35,27 +35,32 @@ export async function pushToAdminBot(type: 'config_update' | 'feedback', content
     // 2. Try to notify via Webhook (Optional, don't throw if fails)
     try {
       const adminWebhook = "https://365.kdocs.cn/woa/api/v1/webhook/send?key=113a89749298fba10dcae6b7cb60db09";
-      const title = type === 'config_update' ? "Config Updated" : "Feedback Received";
       
-      const markdown = `## ${title}
-**User**: ${username}
-**Time**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
-**Content**: 
-\`\`\`json
-${JSON.stringify(content, null, 2)}
-\`\`\`
-`;
+      const payload = {
+        msgtype: "markdown",
+        markdown: { 
+          content: `## Feedback Received\n**User**: ${username}\n**Content**: ${JSON.stringify(content)}` 
+        }
+      };
 
-      await fetch(adminWebhook, {
+      console.log("Sending to webhook:", adminWebhook);
+      console.log("Payload:", JSON.stringify(payload));
+
+      const response = await fetch(adminWebhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          msgtype: "markdown",
-          markdown: { text: markdown }
-        })
+        body: JSON.stringify(payload)
       });
+
+      const resText = await response.text();
+      console.log("Webhook response status:", response.status);
+      console.log("Webhook response body:", resText);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}, body: ${resText}`);
+      }
     } catch (webhookError) {
-      console.warn("Webhook notification failed, but feedback was saved to Redis");
+      console.error("Webhook notification failed:", webhookError);
     }
 
     return { success: true };
