@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+export const dynamic = 'force-dynamic';
+
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
   Sparkles, Cpu, Newspaper, Book, Gamepad2, LineChart, 
@@ -12,7 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { fetchCurrentConfig, persistSettings, persistRSS } from "../config/actions";
 import { pushToAdminBot } from "../config/admin-actions";
 
-// 类型定义
+// ????
 type ThemeStyle = 'tech' | 'finance' | 'paper' | 'chat' | 'card' | 'minimal';
 
 interface ThemePreviewItem {
@@ -40,15 +42,15 @@ interface Theme {
   preview: ThemePreviewItem[];
 }
 
-// 预设主题数据，增加样式配置
+// ?????????????
 const PRESET_THEMES: Theme[] = [
   {
     id: "tech",
-    title: "科技专栏",
-    desc: "追踪全球最前沿的科技动态与商业趋势",
+    title: "????",
+    desc: "?????????????????",
     category: "tech",
     icon: <Cpu className="w-5 h-5" />,
-    style: "tech", // 终端风格
+    style: "tech", // ????
     color: "from-blue-400 to-cyan-300",
     sources: [
       "https://techcrunch.com/feed/",
@@ -56,19 +58,19 @@ const PRESET_THEMES: Theme[] = [
       "https://news.ycombinator.com/rss"
     ],
     preview: [
-      { title: "OpenAI 发布 GPT-5 预览版", meta: "Breaking · 2m ago" },
-      { title: "NVIDIA H200 芯片开始出货", meta: "Hardware · 1h ago" },
-      { title: "SpaceX 星舰完成轨道测试", meta: "Space · 3h ago" },
-      { title: "Linux Kernel 6.8 Released", meta: "Software · 5h ago" }
+      { title: "OpenAI ?? GPT-5 ???", meta: "Breaking � 2m ago" },
+      { title: "NVIDIA H200 ??????", meta: "Hardware � 1h ago" },
+      { title: "SpaceX ????????", meta: "Space � 3h ago" },
+      { title: "Linux Kernel 6.8 Released", meta: "Software � 5h ago" }
     ]
   },
   {
     id: "finance",
-    title: "股价/财经",
-    desc: "实时把握市场脉搏与宏观经济指标",
+    title: "??/??",
+    desc: "???????????????",
     category: "tech",
     icon: <LineChart className="w-5 h-5" />,
-    style: "finance", // 数据看板风格
+    style: "finance", // ??????
     color: "from-green-400 to-emerald-300",
     sources: [
       "https://www.cnbc.com/id/100003114/device/rss/rss.html",
@@ -85,11 +87,11 @@ const PRESET_THEMES: Theme[] = [
   },
   {
     id: "news",
-    title: "全球新闻",
-    desc: "每日重要新闻汇总，直击现场",
+    title: "????",
+    desc: "?????????????",
     category: "tech",
     icon: <Newspaper className="w-5 h-5" />,
-    style: "paper", // 报纸风格
+    style: "paper", // ????
     color: "from-gray-400 to-slate-300",
     sources: [
       "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
@@ -103,11 +105,11 @@ const PRESET_THEMES: Theme[] = [
   },
   {
     id: "ai",
-    title: "AI 实验室",
-    desc: "深度精读大模型、Agent 与 AI 应用进化",
+    title: "AI ???",
+    desc: "????????Agent ? AI ????",
     category: "tech",
     icon: <Sparkles className="w-5 h-5" />,
-    style: "chat", // 对话气泡风格
+    style: "chat", // ??????
     color: "from-purple-400 to-pink-300",
     sources: [
       "https://openai.com/blog/rss.xml",
@@ -115,18 +117,18 @@ const PRESET_THEMES: Theme[] = [
       "https://www.anthropic.com/index.xml"
     ],
     preview: [
-      { role: "ai", content: "今日 AI 重点：DeepSeek 开源了新一代 MoE 模型，性能超越 Llama 3..." },
-      { role: "user", content: "帮我总结一下它的核心架构变动。" },
-      { role: "ai", content: "采用了 160B 参数的混合专家架构，激活参数仅 20B，推理速度提升 4 倍。" }
+      { role: "ai", content: "?? AI ???DeepSeek ?????? MoE ??????? Llama 3..." },
+      { role: "user", content: "???????????????" },
+      { role: "ai", content: "??? 160B ??????????????? 20B??????? 4 ??" }
     ]
   },
   {
     id: "anime",
-    title: "二次元",
-    desc: "新番资讯、漫评与 ACG 圈内动态",
+    title: "???",
+    desc: "???????? ACG ????",
     category: "creative",
     icon: <Gamepad2 className="w-5 h-5" />,
-    style: "card", // 卡片风格
+    style: "card", // ????
     color: "from-orange-400 to-red-300",
     sources: [
       "https://www.animenewsnetwork.com/news/rss.xml",
@@ -134,34 +136,34 @@ const PRESET_THEMES: Theme[] = [
       "https://www.siliconera.com/feed/"
     ],
     preview: [
-      { title: "《电锯人》剧场版定档", tag: "剧场版", color: "bg-orange-500" },
-      { title: "2026 冬季新番一览", tag: "新番", color: "bg-blue-500" },
-      { title: "任天堂新机型情报", tag: "游戏", color: "bg-red-500" },
-      { title: "Comiket 105 参展社团数创新高", tag: "展会", color: "bg-purple-500" }
+      { title: "??????????", tag: "???", color: "bg-orange-500" },
+      { title: "2026 ??????", tag: "??", color: "bg-blue-500" },
+      { title: "????????", tag: "??", color: "bg-red-500" },
+      { title: "Comiket 105 ????????", tag: "??", color: "bg-purple-500" }
     ]
   },
   {
     id: "academic",
-    title: "学术专栏",
-    desc: "顶级期刊与前沿论文的智能摘要",
+    title: "????",
+    desc: "??????????????",
     category: "academic",
     icon: <Book className="w-5 h-5" />,
-    style: "minimal", // 极简论文风格
+    style: "minimal", // ??????
     color: "from-indigo-400 to-blue-300",
     sources: [
       "https://www.nature.com/nature.rss",
       "https://www.science.org/rss/news_current.xml",
-      "http://export.arxiv.org/rss/cs.AI"
+      "https://export.arxiv.org/rss/cs.AI"
     ],
     preview: [
-      { title: "A New Approach to Brain-Computer Interfaces", author: "Nature · J. Smith et al." },
-      { title: "Quantum Error Correction at Scale", author: "Science · Team Google" }
+      { title: "A New Approach to Brain-Computer Interfaces", author: "Nature � J. Smith et al." },
+      { title: "Quantum Error Correction at Scale", author: "Science � Team Google" }
     ]
   },
   {
     id: "design",
-    title: "设计灵感",
-    desc: "UI/UX 趋势、排版美学与创意工具",
+    title: "????",
+    desc: "UI/UX ????????????",
     category: "creative",
     icon: <Palette className="w-5 h-5" />,
     style: "minimal", 
@@ -178,8 +180,8 @@ const PRESET_THEMES: Theme[] = [
   },
   {
     id: "crypto",
-    title: "Web3 前沿",
-    desc: "区块链技术、加密货币与去中心化应用",
+    title: "Web3 ??",
+    desc: "?????????????????",
     category: "tech",
     icon: <Bitcoin className="w-5 h-5" />,
     style: "finance",
@@ -198,8 +200,8 @@ const PRESET_THEMES: Theme[] = [
   },
   {
     id: "indie",
-    title: "独立开发",
-    desc: "一人公司、SaaS 构建与增长黑客",
+    title: "????",
+    desc: "?????SaaS ???????",
     category: "tech",
     icon: <Code2 className="w-5 h-5" />,
     style: "tech",
@@ -210,15 +212,15 @@ const PRESET_THEMES: Theme[] = [
       "https://producthunt.com/feed"
     ],
     preview: [
-      { title: "Launch: AI-powered Notion Template", meta: "ProductHunt · #1" },
+      { title: "Launch: AI-powered Notion Template", meta: "ProductHunt � #1" },
       { title: "How I reached $10k MRR in 3 months", meta: "IndieHackers" },
       { title: "Stripe acquires new payment startup", meta: "TechCrunch" }
     ]
   },
   {
     id: "health",
-    title: "健康生活",
-    desc: "科学养生、健身指南与心理健康",
+    title: "????",
+    desc: "??????????????",
     category: "life",
     icon: <Activity className="w-5 h-5" />,
     style: "paper",
@@ -235,8 +237,8 @@ const PRESET_THEMES: Theme[] = [
   },
   {
     id: "psychology",
-    title: "认知心理",
-    desc: "探索大脑奥秘、行为经济学与思维模型",
+    title: "????",
+    desc: "?????????????????",
     category: "academic",
     icon: <BrainCircuit className="w-5 h-5" />,
     style: "minimal",
@@ -254,14 +256,14 @@ const PRESET_THEMES: Theme[] = [
 ];
 
 const CATEGORIES = [
-  { id: "all", label: "全部" },
-  { id: "tech", label: "科技与商业" },
-  { id: "creative", label: "创意与设计" },
-  { id: "life", label: "生活与健康" },
-  { id: "academic", label: "学术与深度" }
+  { id: "all", label: "??" },
+  { id: "tech", label: "?????" },
+  { id: "creative", label: "?????" },
+  { id: "life", label: "?????" },
+  { id: "academic", label: "?????" }
 ];
 
-// 渲染不同风格的预览组件
+// ???????????
 const ThemePreview = ({ theme }: { theme: Theme }) => {
   switch (theme.style) {
     case "tech":
@@ -293,7 +295,7 @@ const ThemePreview = ({ theme }: { theme: Theme }) => {
             <div key={i} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
               <span className="font-bold text-white text-xs">{item.title}</span>
               <span className={`text-xs font-mono font-black ${item.trend === 'up' ? 'text-green-400' : 'text-red-400'}`}>
-                {item.trend === 'up' ? '▲' : '▼'} {item.value}
+                {item.trend === 'up' ? '?' : '?'} {item.value}
               </span>
             </div>
           ))}
@@ -363,7 +365,7 @@ const ThemePreview = ({ theme }: { theme: Theme }) => {
   }
 };
 
-export default function Dashboard() {
+function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -375,11 +377,11 @@ export default function Dashboard() {
   const [selectedTheme, setSelectedTheme] = useState<any>(null);
   const [subscribedThemeIds, setSubscribedThemeIds] = useState<string[]>([]);
 
-  // 搜索和分类状态
+  // ???????
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
 
-  // 订阅弹窗状态
+  // ??????
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState({
     webhookUrl: "",
@@ -387,11 +389,11 @@ export default function Dashboard() {
     pushDays: [1, 2, 3, 4, 5] as number[]
   });
 
-  // 添加自定义源弹窗状态
+  // ??????????
   const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
   const [addSourceTargetThemeId, setAddSourceTargetThemeId] = useState<string | null>(null);
   const [newSourceUrl, setNewSourceUrl] = useState("");
-  // 存储每个主题的自定义源
+  // ???????????
   const [customThemeSources, setCustomThemeSources] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
@@ -404,22 +406,22 @@ export default function Dashboard() {
         setUsername(authData.username);
 
         const config = await fetchCurrentConfig();
-        // 将 rssSources 数组转换为字符串并合并到 settings 中
+        // ? rssSources ???????????? settings ?
         const settingsWithRss = {
           ...(config.settings || {}),
           rssUrls: config.rssSources ? config.rssSources.join("\n") : ""
         };
         setSettings(settingsWithRss);
-        // 初始化已订阅主题列表
+        // ??????????
         setSubscribedThemeIds(config.settings?.subscribedThemes || []);
-        // 初始化弹窗配置
+        // ???????
         setModalConfig({
           webhookUrl: config.settings?.webhookUrl || "",
           pushTime: config.settings?.pushTime || "8",
           pushDays: config.settings?.pushDays || [1, 2, 3, 4, 5]
         });
 
-        // 检查 URL 参数
+        // ?? URL ??
         const tabParam = searchParams.get('tab');
         if (tabParam === 'active') {
           setActiveTab('active');
@@ -436,18 +438,18 @@ export default function Dashboard() {
   const handleThanks = async () => {
     setThanksLoading(true);
     try {
-      // 推送点赞到阿旭的 Webhook
+      // ???????? Webhook
       await fetch("https://365.kdocs.cn/woa/api/v1/webhook/send?key=113a89749298fba10dcae6b7cb60db09", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           msg_type: "text",
-          content: { text: `🌟 感谢阿旭！用户 [${username}] 刚刚为你点了一个赞，感谢你提供的免费 API 羊毛！` }
+          content: { text: `?? ??????? [${username}] ?????????????????? API ???` }
         })
       });
-      alert("点赞成功！已通过 Webhook 告诉阿旭啦~");
+      alert("???????? Webhook ?????~");
     } catch (e) {
-      alert("点赞失败，但阿旭感受到了你的心意！");
+      alert("?????????????????");
     } finally {
       setThanksLoading(false);
     }
@@ -455,13 +457,13 @@ export default function Dashboard() {
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 这里应该有一个 loading 状态，暂时省略
+    // ??????? loading ???????
     try {
       await persistSettings(settings);
-      alert("个人中心配置已保存！");
+      alert("??????????");
     } catch (error) {
       console.error("Failed to save settings:", error);
-      alert("保存失败，请重试。");
+      alert("?????????");
     }
   };
 
@@ -485,7 +487,7 @@ export default function Dashboard() {
 
   const openSubscribeModal = (theme: any) => {
     setSelectedTheme(theme);
-    // 如果已有配置，使用现有配置；否则使用默认
+    // ????????????????????
     setModalConfig({
       webhookUrl: settings.webhookUrl || "",
       pushTime: settings.pushTime || "8",
@@ -498,38 +500,38 @@ export default function Dashboard() {
     if (!selectedTheme) return; // Add guard for selectedTheme
 
     if (!modalConfig.webhookUrl && !settings.webhookUrl) {
-      alert("请填写 Webhook 地址以接收推送");
+      alert("??? Webhook ???????");
       return;
     }
 
     setLoading(true);
     try {
-      // 1. 保存 RSS
+      // 1. ?? RSS
       const currentSources = settings.rssUrls ? settings.rssUrls.split("\n").filter(Boolean) : [];
       
-      // 合并主题默认源和用户自定义添加的源
+      // ?????????????????
       const themeCustomSources = customThemeSources[selectedTheme.id] || [];
       const allThemeSources = [...selectedTheme.sources, ...themeCustomSources];
 
       const newSources = Array.from(new Set([...currentSources, ...allThemeSources]));
       await persistRSS(newSources);
 
-      // 2. 保存设置 (Webhook & Schedule) - 不包含 rssUrls
+      // 2. ???? (Webhook & Schedule) - ??? rssUrls
       const newSubscribedThemeIds = Array.from(new Set([...subscribedThemeIds, selectedTheme.id]));
       const newSettingsForSave = {
         ...settings,
         webhookUrl: modalConfig.webhookUrl || settings.webhookUrl,
         pushTime: modalConfig.pushTime,
         pushDays: modalConfig.pushDays,
-        subscribedThemes: newSubscribedThemeIds, // 保存订阅的主题ID列表
-        // 确保其他必要字段存在
+        subscribedThemes: newSubscribedThemeIds, // ???????ID??
+        // ??????????
         aiProvider: settings.aiProvider || "google",
         configMode: settings.configMode || "simple"
       };
-      delete (newSettingsForSave as any).rssUrls; // 删除 rssUrls 避免存入 settings
+      delete (newSettingsForSave as any).rssUrls; // ?? rssUrls ???? settings
       await persistSettings(newSettingsForSave);
       
-      // 3. 更新本地状态（包含 rssUrls 用于前端显示）
+      // 3. ????????? rssUrls ???????
       const newSettings = {
         ...newSettingsForSave,
         rssUrls: newSources.join("\n")
@@ -537,19 +539,19 @@ export default function Dashboard() {
       setSettings(newSettings);
       setSubscribedThemeIds(newSubscribedThemeIds);
       setIsModalOpen(false);
-      alert(`🎉 订阅成功！已为您添加 [${selectedTheme.title}] 到订阅列表。`);
+      alert(`?? ?????????? [${selectedTheme.title}] ??????`);
       
-      // 刷新页面或跳转
-      // router.refresh(); // 可选
+      // ???????
+      // router.refresh(); // ??
     } catch (error) {
       console.error("Subscription failed:", error);
-      alert("订阅失败，请重试");
+      alert("????????");
     } finally {
       setLoading(false);
     }
   };
 
-  // 过滤主题逻辑
+  // ??????
   const filteredThemes = PRESET_THEMES.filter(theme => {
     const matchesSearch = theme.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           theme.desc.toLowerCase().includes(searchQuery.toLowerCase());
@@ -561,16 +563,16 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen text-white font-sans selection:bg-blue-500/30 selection:text-white overflow-x-hidden relative">
-      {/* 顶部导航 */}
+      {/* ???? */}
       <header className="sticky top-0 z-50 bg-[#030712]/80 backdrop-blur-xl border-b border-white/10 supports-[backdrop-filter]:bg-[#030712]/60 px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3 cursor-pointer group" onClick={() => router.push("/home")}>
           <span className="text-xl font-black tracking-tighter font-serif text-white drop-shadow-md">Weave</span>
         </div>
         <div className="flex items-center gap-6">
           <nav className="hidden md:flex items-center bg-white/10 p-1 rounded-2xl border border-white/10 backdrop-blur-sm">
-            <button onClick={() => setActiveTab('shelf')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'shelf' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>主题货架</button>
-            <button onClick={() => setActiveTab('active')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'active' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>已订阅</button>
-            <button onClick={() => setActiveTab('settings')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'settings' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>个人中心</button>
+            <button onClick={() => setActiveTab('shelf')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'shelf' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>????</button>
+            <button onClick={() => setActiveTab('active')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'active' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>???</button>
+            <button onClick={() => setActiveTab('settings')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'settings' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>????</button>
           </nav>
           <div className="h-8 w-px bg-white/10 mx-2" />
           <div className="flex items-center gap-3">
@@ -606,8 +608,8 @@ export default function Dashboard() {
                         {selectedTheme.icon}
                       </div>
                       <div>
-                        <h3 className="text-2xl font-black text-blue-950">订阅配置</h3>
-                        <p className="text-xs text-blue-900/40 font-bold mt-1 uppercase tracking-widest">主题：{selectedTheme.title}</p>
+                        <h3 className="text-2xl font-black text-blue-950">????</h3>
+                        <p className="text-xs text-blue-900/40 font-bold mt-1 uppercase tracking-widest">???{selectedTheme.title}</p>
                       </div>
                     </div>
                     <button onClick={() => setIsModalOpen(false)} className="p-3 bg-white/5 rounded-full hover:bg-white/10 transition-colors border border-white/10">
@@ -616,24 +618,24 @@ export default function Dashboard() {
                   </div>
 
                   <div className="space-y-8">
-                    {/* Webhook 配置 (仅当未配置时显示) */}
+                    {/* Webhook ?? (????????) */}
                     {!settings.webhookUrl && (
                       <div className="space-y-3">
-                        <label className="text-xs font-black text-blue-900/30 uppercase tracking-widest ml-1 block">Webhook 地址 (必填)</label>
+                        <label className="text-xs font-black text-blue-900/30 uppercase tracking-widest ml-1 block">Webhook ?? (??)</label>
                         <input 
                           type="text" 
                           value={modalConfig.webhookUrl}
                           onChange={(e) => setModalConfig(prev => ({ ...prev, webhookUrl: e.target.value }))}
-                          placeholder="请输入机器人 Webhook 地址"
+                          placeholder="?????? Webhook ??"
                           className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-blue-900/20"
                         />
-                        <p className="text-[10px] text-blue-900/20 ml-1 font-medium">首次订阅需配置接收地址，后续可直接复用。</p>
+                        <p className="text-[10px] text-blue-900/20 ml-1 font-medium">????????????????????</p>
                       </div>
                     )}
 
-                    {/* 推送时间 */}
+                    {/* ???? */}
                     <div className="space-y-3">
-                      <label className="text-xs font-black text-blue-900/20 uppercase tracking-widest ml-1 block">每日推送时间</label>
+                      <label className="text-xs font-black text-blue-900/20 uppercase tracking-widest ml-1 block">??????</label>
                       <div className="grid grid-cols-6 gap-2">
                         {Array.from({ length: 24 }).map((_, i) => (
                           <button 
@@ -647,11 +649,11 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* 推送周期 */}
+                    {/* ???? */}
                     <div className="space-y-3">
-                      <label className="text-xs font-black text-blue-900/20 uppercase tracking-widest ml-1 block">推送周期</label>
+                      <label className="text-xs font-black text-blue-900/20 uppercase tracking-widest ml-1 block">????</label>
                       <div className="flex flex-wrap gap-2">
-                        {[{ label: "周一", val: 1 }, { label: "周二", val: 2 }, { label: "周三", val: 3 }, { label: "周四", val: 4 }, { label: "周五", val: 5 }, { label: "周六", val: 6 }, { label: "周日", val: 0 }].map((day) => (
+                        {[{ label: "??", val: 1 }, { label: "??", val: 2 }, { label: "??", val: 3 }, { label: "??", val: 4 }, { label: "??", val: 5 }, { label: "??", val: 6 }, { label: "??", val: 0 }].map((day) => (
                           <button 
                             key={day.val} 
                             onClick={() => { 
@@ -675,7 +677,7 @@ export default function Dashboard() {
                     {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (
                       <>
                         <CheckCircle2 className="w-6 h-6" />
-                        确认订阅
+                        ????
                       </>
                     )}
                   </button>
@@ -697,14 +699,14 @@ export default function Dashboard() {
               >
                 <div className="p-10 space-y-8">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-2xl font-black text-blue-950 uppercase tracking-tighter">添加 RSS 源</h3>
+                    <h3 className="text-2xl font-black text-blue-950 uppercase tracking-tighter">?? RSS ?</h3>
                     <button onClick={() => setIsAddSourceModalOpen(false)} className="p-3 bg-white/5 rounded-full hover:bg-white/10 transition-colors border border-white/10">
                       <X className="w-5 h-5 text-blue-900/30" />
                     </button>
                   </div>
                   
                   <div className="space-y-3">
-                    <label className="text-xs font-black text-blue-900/30 uppercase tracking-widest ml-1 block">RSS 链接</label>
+                    <label className="text-xs font-black text-blue-900/30 uppercase tracking-widest ml-1 block">RSS ??</label>
                     <input 
                       type="text" 
                       value={newSourceUrl}
@@ -720,7 +722,7 @@ export default function Dashboard() {
                     className="w-full py-5 bg-blue-600 text-white rounded-[24px] font-black text-xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-3 disabled:bg-gray-100 disabled:shadow-none disabled:text-gray-400"
                   >
                     <Plus className="w-6 h-6" />
-                    确认添加
+                    ????
                   </button>
                 </div>
               </motion.div>
@@ -735,16 +737,16 @@ export default function Dashboard() {
               className="space-y-12"
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">选择你关注的主题</h2>
+                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">????????</h2>
               </div>
 
-              {/* 搜索和分类栏 */}
+              {/* ?????? */}
               <div className="space-y-8 bg-white/10 p-8 rounded-[40px] border border-white/10 backdrop-blur-md shadow-2xl ring-1 ring-white/5">
                 <div className="relative group">
                   <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-7 h-7 text-white/40 group-focus-within:text-white transition-colors" />
                   <input 
                     type="text" 
-                    placeholder="搜索感兴趣的主题（如：AI、设计、财经...）" 
+                    placeholder="???????????AI??????...?" 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full bg-white/10 border border-white/10 rounded-[24px] pl-16 pr-8 py-6 text-lg outline-none focus:ring-2 focus:ring-blue-400 transition-all font-medium text-white placeholder:text-white/20"
@@ -777,7 +779,7 @@ export default function Dashboard() {
                     className="break-inside-avoid group relative flex flex-col"
                   >
                     <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-blue-400/30 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5">
-                      {/* 头部信息 */}
+                      {/* ???? */}
                       <div className="flex items-center justify-between mb-8">
                         <div className="flex items-center gap-4">
                           <div className={`p-3.5 bg-white/10 rounded-2xl text-blue-300 border border-white/10 group-hover:bg-white group-hover:text-blue-950 transition-all duration-500`}>
@@ -789,11 +791,11 @@ export default function Dashboard() {
                           onClick={() => openSubscribeModal(theme)}
                           className="px-5 py-2.5 bg-white text-blue-950 text-sm font-bold rounded-full opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0 shadow-lg hover:scale-105"
                         >
-                          订阅
+                          ??
                         </button>
                       </div>
 
-                      {/* 差异化预览组件 */}
+                      {/* ??????? */}
                       <div className="mb-8">
                         <ThemePreview theme={theme} />
                       </div>
@@ -806,7 +808,7 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-2">
                             <Rss className="w-4 h-4 text-blue-100/50" />
-                            <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">包含 {theme.sources.length + (customThemeSources[theme.id]?.length || 0)} 个信源</span>
+                            <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">?? {theme.sources.length + (customThemeSources[theme.id]?.length || 0)} ???</span>
                           </div>
                           <button 
                             onClick={(e) => {
@@ -816,7 +818,7 @@ export default function Dashboard() {
                             className="flex items-center gap-1.5 text-[10px] font-black text-blue-300 hover:text-blue-200 bg-blue-500/20 px-3 py-1.5 rounded-xl transition-colors uppercase tracking-widest"
                           >
                             <Plus className="w-3.5 h-3.5" />
-                            添加源
+                            ???
                           </button>
                         </div>
                         <div className="flex flex-wrap gap-2.5">
@@ -832,7 +834,7 @@ export default function Dashboard() {
                   </motion.div>
                 ))}
                 
-                {/* 自由配置入口 */}
+                {/* ?????? */}
                 <div 
                   onClick={() => router.push("/config")}
                   className="break-inside-avoid cursor-pointer group"
@@ -842,8 +844,8 @@ export default function Dashboard() {
                       <Plus className="w-8 h-8" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-white font-serif italic">自由配置模式</h3>
-                      <p className="text-sm text-blue-100/50 mt-2 font-bold uppercase tracking-widest">自定义您的专属情报流</p>
+                      <h3 className="text-xl font-black text-white font-serif italic">??????</h3>
+                      <p className="text-sm text-blue-100/50 mt-2 font-bold uppercase tracking-widest">??????????</p>
                     </div>
                   </div>
                 </div>
@@ -857,15 +859,15 @@ export default function Dashboard() {
               className="space-y-12"
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">已订阅主题</h2>
+                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">?????</h2>
                 <button onClick={() => router.push("/config")} className="flex items-center gap-3 text-blue-600 font-black text-sm uppercase tracking-[0.2em] hover:text-blue-700 transition-colors group">
-                  新增自定义配置 <Settings2 className="w-5 h-5 group-hover:rotate-90 transition-transform duration-500" />
+                  ??????? <Settings2 className="w-5 h-5 group-hover:rotate-90 transition-transform duration-500" />
                 </button>
               </div>
 
               {subscribedThemeIds.length > 0 || settings.rssUrls ? (
                 <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
-                  {/* 已订阅主题卡片 */}
+                  {/* ??????? */}
                   {subscribedThemeIds.map((themeId) => {
                     const theme = PRESET_THEMES.find(t => t.id === themeId);
                     if (!theme) return null;
@@ -879,12 +881,12 @@ export default function Dashboard() {
                         className="break-inside-avoid group relative flex flex-col"
                       >
                         <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-blue-500/20 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5">
-                          {/* 已订阅标签 */}
+                          {/* ????? */}
                           <div className="absolute top-6 right-6 px-4 py-1.5 bg-green-500/20 text-green-300 text-[10px] font-black rounded-full border border-green-500/30 uppercase tracking-widest">
-                            已订阅
+                            ???
                           </div>
                           
-                          {/* 头部信息 */}
+                          {/* ???? */}
                           <div className="flex items-center gap-4 mb-8">
                             <div className="p-3.5 bg-white/10 rounded-2xl text-blue-600 border border-white/10 group-hover:bg-white group-hover:text-blue-950 transition-all duration-500">
                               {theme.icon}
@@ -892,7 +894,7 @@ export default function Dashboard() {
                             <h3 className="text-xl font-black text-white font-serif">{theme.title}</h3>
                           </div>
 
-                          {/* 差异化预览组件 */}
+                          {/* ??????? */}
                           <div className="mb-8">
                             <ThemePreview theme={theme} />
                           </div>
@@ -905,7 +907,7 @@ export default function Dashboard() {
                             <div className="flex items-center justify-between mb-4">
                               <div className="flex items-center gap-2">
                                 <Rss className="w-4 h-4 text-blue-100/50" />
-                                <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">包含 {allSources.length} 个信源</span>
+                                <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">?? {allSources.length} ???</span>
                               </div>
                             </div>
                             <div className="flex flex-wrap gap-2.5">
@@ -922,7 +924,7 @@ export default function Dashboard() {
                     );
                   })}
                   
-                  {/* 自定义 RSS 源（不属于任何主题的） */}
+                  {/* ??? RSS ??????????? */}
                   {(() => {
                     const allThemesSources = subscribedThemeIds.flatMap(id => {
                       const theme = PRESET_THEMES.find(t => t.id === id);
@@ -943,8 +945,8 @@ export default function Dashboard() {
                               <Plus className="w-5 h-5" />
                             </div>
                             <div>
-                              <h3 className="text-xl font-black text-white font-serif">自定义源</h3>
-                              <p className="text-xs text-blue-100/60 font-bold uppercase tracking-widest mt-1">{customRssSources.length} 个信源</p>
+                              <h3 className="text-xl font-black text-white font-serif">????</h3>
+                              <p className="text-xs text-blue-100/60 font-bold uppercase tracking-widest mt-1">{customRssSources.length} ???</p>
                             </div>
                           </div>
                           
@@ -956,7 +958,7 @@ export default function Dashboard() {
                               </div>
                             ))}
                             {customRssSources.length > 5 && (
-                              <p className="text-[10px] text-blue-100/50 font-black uppercase tracking-widest text-center pt-2">还有 {customRssSources.length - 5} 个更多源...</p>
+                              <p className="text-[10px] text-blue-100/50 font-black uppercase tracking-widest text-center pt-2">?? {customRssSources.length - 5} ????...</p>
                             )}
                           </div>
                         </div>
@@ -969,8 +971,8 @@ export default function Dashboard() {
                   <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-8 border border-white/10">
                     <Rss className="w-10 h-10 text-blue-200/20" />
                   </div>
-                  <p className="text-blue-200/70 font-bold text-xl mb-10 uppercase tracking-[0.2em]">您还没有订阅任何主题</p>
-                  <button onClick={() => setActiveTab('shelf')} className="px-12 py-5 bg-white text-blue-950 rounded-[24px] font-black text-xl shadow-2xl shadow-white/5 hover:scale-105 transition-all">去主题货架看看</button>
+                  <p className="text-blue-200/70 font-bold text-xl mb-10 uppercase tracking-[0.2em]">??????????</p>
+                  <button onClick={() => setActiveTab('shelf')} className="px-12 py-5 bg-white text-blue-950 rounded-[24px] font-black text-xl shadow-2xl shadow-white/5 hover:scale-105 transition-all">???????</button>
                 </div>
               )}
             </motion.div>
@@ -982,42 +984,42 @@ export default function Dashboard() {
               className="max-w-3xl mx-auto space-y-12"
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">个人中心</h2>
+                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">????</h2>
                 <button 
                   onClick={() => document.getElementById('settings-form')?.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }))}
                   className="px-8 py-3 bg-white text-blue-950 rounded-full font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-white/10"
                 >
-                  保存设置
+                  ????
                 </button>
               </div>
               
               <form id="settings-form" onSubmit={handleSaveSettings} className="space-y-10">
-                {/* Webhook 配置 */}
+                {/* Webhook ?? */}
                 <div className="bg-white/10 rounded-[40px] border border-white/10 p-10 shadow-2xl backdrop-blur-md ring-1 ring-white/5 space-y-8">
                   <div className="flex items-center gap-5">
                     <div className="p-4 bg-white/10 rounded-2xl text-blue-300 border border-white/10"><Bell className="w-7 h-7" /></div>
-                    <h3 className="text-2xl font-black text-white font-serif">推送设置</h3>
+                    <h3 className="text-2xl font-black text-white font-serif">????</h3>
                   </div>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-xs font-black text-white uppercase tracking-widest ml-1 mb-3 block">Webhook 地址</label>
+                      <label className="text-xs font-black text-white uppercase tracking-widest ml-1 mb-3 block">Webhook ??</label>
                       <input 
                         type="text" 
                         value={settings.webhookUrl || ""} 
                         onChange={(e) => setSettings({...settings, webhookUrl: e.target.value})}
-                        placeholder="请输入机器人 Webhook 地址"
+                        placeholder="?????? Webhook ??"
                         className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-base outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/30"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* API 状态 */}
+                {/* API ?? */}
                 <div className="bg-white/10 rounded-[40px] border border-white/10 p-10 shadow-2xl backdrop-blur-md ring-1 ring-white/5 space-y-8">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-5">
                       <div className="p-4 bg-white/10 rounded-2xl text-blue-300 border border-white/10"><Zap className="w-7 h-7" /></div>
-                      <h3 className="text-2xl font-black text-white font-serif">AI 引擎配置</h3>
+                      <h3 className="text-2xl font-black text-white font-serif">AI ????</h3>
                     </div>
                     {(!settings.geminiApiKey && !settings.openaiApiKey) && (
                       <button 
@@ -1026,7 +1028,7 @@ export default function Dashboard() {
                         className="px-5 py-2.5 bg-blue-500/20 text-blue-300 rounded-xl font-black text-[10px] hover:bg-blue-500/30 transition-all flex items-center gap-2 border border-blue-500/30 uppercase tracking-widest"
                       >
                         {thanksLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Heart className="w-3.5 h-3.5 fill-current" />}
-                        使用免费 API (感谢阿旭)
+                        ???? API (????)
                       </button>
                     )}
                   </div>
@@ -1034,7 +1036,7 @@ export default function Dashboard() {
                   <div className="space-y-6">
                     <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/5">
                       <button type="button" onClick={() => setSettings({...settings, aiProvider: 'google'})} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${settings.aiProvider === 'google' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/40 hover:text-white'}`}>Google Gemini</button>
-                      <button type="button" onClick={() => setSettings({...settings, aiProvider: 'openai'})} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${settings.aiProvider === 'openai' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/40 hover:text-white'}`}>OpenAI / 兼容平台</button>
+                      <button type="button" onClick={() => setSettings({...settings, aiProvider: 'openai'})} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${settings.aiProvider === 'openai' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/40 hover:text-white'}`}>OpenAI / ????</button>
                     </div>
 
                     {settings.aiProvider === 'google' ? (
@@ -1044,7 +1046,7 @@ export default function Dashboard() {
                           type="password" 
                           value={settings.geminiApiKey || ""} 
                           onChange={(e) => setSettings({...settings, geminiApiKey: e.target.value})}
-                          placeholder="留空则使用免费额度"
+                          placeholder="?????????"
                           className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-base outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/30"
                         />
                       </div>
@@ -1086,12 +1088,20 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* 底部按钮移除，已移至顶部 */}
+                {/* ???????????? */}
               </form>
             </motion.div>
           )}
         </AnimatePresence>
       </main>
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-transparent"><Loader2 className="w-12 h-12 animate-spin text-white" /></div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
