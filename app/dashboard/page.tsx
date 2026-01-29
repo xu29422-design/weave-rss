@@ -365,7 +365,7 @@ const ThemePreview = ({ theme }: { theme: Theme }) => {
   }
 };
 
-function DashboardContent() {
+export default function Dashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -1095,13 +1095,5 @@ function DashboardContent() {
         </AnimatePresence>
       </main>
     </div>
-  );
-}
-
-export default function Dashboard() {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-transparent"><Loader2 className="w-12 h-12 animate-spin text-white" /></div>}>
-      <DashboardContent />
-    </Suspense>
   );
 }
