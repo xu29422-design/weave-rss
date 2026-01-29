@@ -304,6 +304,41 @@ export default function AdminPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* 推送日志部分 */}
+                {user.pushLogs && user.pushLogs.length > 0 && (
+                  <div className="mt-6 pt-6 border-t border-slate-100">
+                    <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-3">最近推送日志</div>
+                    <div className="space-y-2">
+                      {user.pushLogs.map((log: any) => (
+                        <div key={log.id} className="flex items-center justify-between text-[11px] bg-slate-50/50 p-2 rounded-xl border border-slate-100/50">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-1.5 h-1.5 rounded-full ${log.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                            <span className="text-slate-400 font-mono">
+                              {new Date(log.timestamp).toLocaleString('zh-CN', { 
+                                month: 'numeric', 
+                                day: 'numeric', 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
+                            </span>
+                            <span className={`font-bold ${log.status === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {log.status === 'success' ? '推送成功' : '推送失败'}
+                            </span>
+                            {log.error && (
+                              <span className="text-red-400 truncate max-w-[200px]" title={log.error}>
+                                : {log.error}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-slate-400">
+                            {log.details?.sourceCount || 0} 源 / {log.details?.themeCount || 0} 主题
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </motion.div>
             ))}
 

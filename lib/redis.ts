@@ -84,3 +84,44 @@ export async function saveRSSSources(userId: string, sources: string[]) {
   if (!globalKv) throw new Error("KV 客户端未初始化");
   await globalKv.set(getUserRSSKey(userId), sources);
 }
+
+/**
+ * 推送日志接口
+ */
+export interface PushLog {
+  id: string;
+  timestamp: string;
+  status: 'success' | 'failed';
+  error?: string;
+  details?: {
+    themeCount: number;
+    sourceCount: number;
+  };
+}
+
+/**
+ * 保存推送日志 (保留最近 50 条)
+ */
+export async function savePushLog(userId: string, log: Omit<PushLog, 'id' | 'timestamp'>) {
+  if (!globalKv) return;
+  const key = `user:${userId}:push_logs`;
+  const newLog: PushLog = {
+    ...log,
+    id: `log_${Date.now()}`,
+    timestamp: new Date().toISOString(),
+  };
+  
+  // 使用 lpush 和 ltrim 保留最近 50 条记录
+  await globalKv.lpush(key, JSON.stringify(newLog));
+  await globalKv.ltrim(key, 0, 49);
+}
+
+/**
+ * 获取用户最近的推送日志
+ */
+export async function getPushLogs(userId: string): Promise<PushLog[]> {
+  if (!globalKv) return [];
+  const key = `user:${userId}:push_logs`;
+  const logs = await globalKv.lrange<string>(key, 0, -1);
+  return logs.map(l => JSON.parse(l));
+}

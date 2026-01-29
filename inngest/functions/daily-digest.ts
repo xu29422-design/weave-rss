@@ -1,5 +1,5 @@
 import { inngest } from "../client";
-import { getSettings, getRSSSources } from "@/lib/redis";
+import { getSettings, getRSSSources, savePushLog } from "@/lib/redis";
 import { fetchNewItems } from "@/lib/rss-utils";
 import { analyzeItem, writeCategorySection, generateTLDR } from "@/lib/ai-service";
 import { getAllActiveUsers } from "@/lib/auth";
@@ -212,9 +212,24 @@ export const digestWorker = inngest.createFunction(
         
         if (response.status === 200 || response.ok) {
           console.log("✅ 简报发送成功！");
+          await savePushLog(userId, {
+            status: 'success',
+            details: {
+              themeCount: settings.subscribedThemes?.length || 0,
+              sourceCount: rssSources.length
+            }
+          });
           return { status: "sent", length: reportContent.length, wps_response: result };
         } else {
           console.error("❌ 发送失败:", result);
+          await savePushLog(userId, {
+            status: 'failed',
+            error: typeof result === 'string' ? result : JSON.stringify(result),
+            details: {
+              themeCount: settings.subscribedThemes?.length || 0,
+              sourceCount: rssSources.length
+            }
+          });
           return { status: "failed", error: result };
         }
       }

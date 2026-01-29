@@ -72,10 +72,16 @@ export async function getAllUserStats() {
       const settings = await kv.get(key);
       const rssSources = await kv.get(`user:${userId}:rss_sources`);
       
+      // Get push logs
+      const pushLogsKey = `user:${userId}:push_logs`;
+      const pushLogsRaw = await kv.lrange(pushLogsKey, 0, 9); 
+      const pushLogs = pushLogsRaw.map((l: any) => typeof l === 'string' ? JSON.parse(l) : l);
+      
       stats.push({
         userId,
         settings,
         rssSources: rssSources || [],
+        pushLogs: pushLogs || [],
       });
     }
 
