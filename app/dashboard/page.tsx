@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
   Sparkles, Cpu, Newspaper, Book, Gamepad2, LineChart, 
@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { fetchCurrentConfig, persistSettings, persistRSS } from "../config/actions";
 import { pushToAdminBot } from "../config/admin-actions";
 
-// 缂侇偉顕ч悗椋庘偓瑙勭煯缁?
+// 类型定义
 type ThemeStyle = 'tech' | 'finance' | 'paper' | 'chat' | 'card' | 'minimal';
 
 interface ThemePreviewItem {
@@ -40,14 +40,15 @@ interface Theme {
   preview: ThemePreviewItem[];
 }
 
-// 濡澘瀚鏇熺▔婵犳凹鏆柡浣哄瀹撲線鏁嶇仦绛嬫澔闁告梻濮甸悧鍗烆嚕韫囨稑甯崇紓?const PRESET_THEMES: Theme[] = [
+// 预设主题数据，增加样式配置
+const PRESET_THEMES: Theme[] = [
   {
     id: "tech",
-    title: "缂佸鍨舵俊褎绋夐幘瀵稿焿",
-    desc: "閺夆晛鈧喖鍤嬮柛蹇嬪妿閹棝寮甸埀顒勫礈瀹ュ棝鍎撮柣銊ュ椤牠骞庨埀顒勫礉閵婏腹鍋撴担椋庣憿闁哥喎妫旂粭鐔烘惥鐎ｎ亜鈼?,
+    title: "科技专栏",
+    desc: "追踪全球最前沿的科技动态与商业趋势",
     category: "tech",
     icon: <Cpu className="w-5 h-5" />,
-    style: "tech", // 缂備礁鐗忛顒侇槹鎼淬垻澹?
+    style: "tech", // 终端风格
     color: "from-blue-400 to-cyan-300",
     sources: [
       "https://techcrunch.com/feed/",
@@ -55,19 +56,19 @@ interface Theme {
       "https://news.ycombinator.com/rss"
     ],
     preview: [
-      { title: "OpenAI 闁告瑦鍨电粩?GPT-5 濡澘瀚～宥夋偋?, meta: "Breaking 鐠?2m ago" },
-      { title: "NVIDIA H200 闁间警鍨虫晶鏍ь嚕閳ь剚鎱ㄧ€ｎ亜姣夐悹?, meta: "Hardware 鐠?1h ago" },
-      { title: "SpaceX 闁哄嫮鍠曢崺宀€鈧懓鏈崹姘姜閵娾晙澹曟繛鏉戭儓閻?, meta: "Space 鐠?3h ago" },
-      { title: "Linux Kernel 6.8 Released", meta: "Software 鐠?5h ago" }
+      { title: "OpenAI 发布 GPT-5 预览版", meta: "Breaking · 2m ago" },
+      { title: "NVIDIA H200 芯片开始出货", meta: "Hardware · 1h ago" },
+      { title: "SpaceX 星舰完成轨道测试", meta: "Space · 3h ago" },
+      { title: "Linux Kernel 6.8 Released", meta: "Software · 5h ago" }
     ]
   },
   {
     id: "finance",
-    title: "闁兼祴鈧尙骞?閻犳劑鍨荤划?,
-    desc: "閻庡湱鍋炲鍌炲箮婵犲啫缍戦悽顖氬€稿┃鈧柤鏉戭槹閹ɑ绋夋惔锛勬殲閻熸瑥鍊荤划鈥趁规惔銏犵樄闁?,
+    title: "股价/财经",
+    desc: "实时把握市场脉搏与宏观经济指标",
     category: "tech",
     icon: <LineChart className="w-5 h-5" />,
-    style: "finance", // 闁轰胶澧楀畵渚€鎯囩€ｎ偅绶插瀣閻?
+    style: "finance", // 数据看板风格
     color: "from-green-400 to-emerald-300",
     sources: [
       "https://www.cnbc.com/id/100003114/device/rss/rss.html",
@@ -84,11 +85,11 @@ interface Theme {
   },
   {
     id: "news",
-    title: "闁稿繈鍔庨幃鍡涘棘娴煎瓨顦?,
-    desc: "婵絽绻戝Λ鈺呮煂瀹ュ牜娲ｉ柡鍌欏嵆濡炲牆效閸ャ劉鍋撴导娆戠闁烩晜娼欓崵顕€鎮抽弶鎸庣皻",
+    title: "全球新闻",
+    desc: "每日重要新闻汇总，直击现场",
     category: "tech",
     icon: <Newspaper className="w-5 h-5" />,
-    style: "paper", // 闁硅翰鍎抽悞濠冾槹鎼淬垻澹?
+    style: "paper", // 报纸风格
     color: "from-gray-400 to-slate-300",
     sources: [
       "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
@@ -102,11 +103,11 @@ interface Theme {
   },
   {
     id: "ai",
-    title: "AI 閻庡湱鍋ら悰娆戔偓?,
-    desc: "婵烇絽宕€瑰磭鍒掗幑鎰靛殺濠㈠爢鍕€渚€宕圭€ｃ劉鍋撴稉鍒nt 濞?AI 閹煎瓨姊婚弫銈嗘交濞戞ê顕?,
+    title: "AI 实验室",
+    desc: "深度精读大模型、Agent 与 AI 应用进化",
     category: "tech",
     icon: <Sparkles className="w-5 h-5" />,
-    style: "chat", // 閻庣數顢婇惁钘夘潩閺冣偓閸︾儤顦版惔銏㈠
+    style: "chat", // 对话气泡风格
     color: "from-purple-400 to-pink-300",
     sources: [
       "https://openai.com/blog/rss.xml",
@@ -114,18 +115,18 @@ interface Theme {
       "https://www.anthropic.com/index.xml"
     ],
     preview: [
-      { role: "ai", content: "濞寸姴锕ュΛ?AI 闂佹彃绉堕崑锝夋晬濞嗙epSeek 鐎殿喒鍋撴繝褎鍔掔花锟犲棘妫颁胶顏卞ù?MoE 婵☆垪鈧磭鈧兘鏁嶇仦閿亾瑜戦崗妯兼惥閸涙壆楔 Llama 3..." },
-      { role: "user", content: "閻㈩垼鍠楅崹婊堝箑閼姐倗娉㈠☉鎾亾濞戞挸顑呴悾鐘绘儍閸曨剛澹嬮煫鍥у暞閻忥箓寮搁崟顐㈢秮闁告柣鍔婇埀? },
-      { role: "ai", content: "闂佹彃娲ㄩ弫銈嗙?160B 闁告瑥鍊归弳鐔兼儍閸曨剝绌块柛姘墔缁楁挾鈧鍩栭悘锕傚几閸曞墎绀夋繝纰樺亾婵炶尪顕у顒勫极妫颁胶鐭?20B闁挎稑鏈敮褰掓偠閸℃稈鍋撻悢宄邦唺闁圭粯鍔曞畷?4 闁稿﹤绉查埀? }
+      { role: "ai", content: "今日 AI 重点：DeepSeek 开源了新一代 MoE 模型，性能超越 Llama 3..." },
+      { role: "user", content: "帮我总结一下它的核心架构变动。" },
+      { role: "ai", content: "采用了 160B 参数的混合专家架构，激活参数仅 20B，推理速度提升 4 倍。" }
     ]
   },
   {
     id: "anime",
-    title: "濞存粌鏈濂稿礂?,
-    desc: "闁哄倹澹嗛弳妯兼導閸曨噮鍞甸柕鍡曠劍閺嬩胶鎷犻崟顏嗙憿 ACG 闁革箑鐗嗛崬鎾礉閵婏腹鍋?,
+    title: "二次元",
+    desc: "新番资讯、漫评与 ACG 圈内动态",
     category: "creative",
     icon: <Gamepad2 className="w-5 h-5" />,
-    style: "card", // 闁告绱曟晶鏍槹鎼淬垻澹?
+    style: "card", // 卡片风格
     color: "from-orange-400 to-red-300",
     sources: [
       "https://www.animenewsnetwork.com/news/rss.xml",
@@ -133,19 +134,19 @@ interface Theme {
       "https://www.siliconera.com/feed/"
     ],
     preview: [
-      { title: "闁靛棗锕﹂弫鎼佹煥椤栨瑦鐪介柕鍡楊儏婢т粙宕烽搹鐟邦暭閻庤纰嶉妴?, tag: "闁告挆鍐╃皻闁?, color: "bg-orange-500" },
-      { title: "2026 闁告劦鍓欓婊堝棘閹殿喗娈☉鎾亾閻?, tag: "闁哄倹澹嗛弳?, color: "bg-blue-500" },
-      { title: "濞寸姾顕ч妵澶愬醇閸屾稒鐓€闁哄牆鎼悗鐑藉箚閸涱喖袚", tag: "婵炴挸鎲￠崹?, color: "bg-red-500" },
-      { title: "Comiket 105 闁告瑥鍊搁惈宥囩矆閹勭闁轰焦婢橀崹閬嶅棘娴煎褰?, tag: "閻忕偞娲戠槐?, color: "bg-purple-500" }
+      { title: "《电锯人》剧场版定档", tag: "剧场版", color: "bg-orange-500" },
+      { title: "2026 冬季新番一览", tag: "新番", color: "bg-blue-500" },
+      { title: "任天堂新机型情报", tag: "游戏", color: "bg-red-500" },
+      { title: "Comiket 105 参展社团数创新高", tag: "展会", color: "bg-purple-500" }
     ]
   },
   {
     id: "academic",
-    title: "閻庢冻闄勫﹢铏▔閹惧鍩?,
-    desc: "濡炪倕澧庢鍥嫉閻斿嘲鐏佸☉鎾抽婢х姴鈻介懗顖ｅ晥闁哄倸娲ㄥ▓鎴﹀疾妤﹀灝鍘撮柟鑺ヮ焾椤?,
+    title: "学术专栏",
+    desc: "顶级期刊与前沿论文的智能摘要",
     category: "academic",
     icon: <Book className="w-5 h-5" />,
-    style: "minimal", // 闁哄鑳堕悾婵堟媼閻戞ɑ鐎瀣閻?
+    style: "minimal", // 极简论文风格
     color: "from-indigo-400 to-blue-300",
     sources: [
       "https://www.nature.com/nature.rss",
@@ -153,14 +154,14 @@ interface Theme {
       "http://export.arxiv.org/rss/cs.AI"
     ],
     preview: [
-      { title: "A New Approach to Brain-Computer Interfaces", author: "Nature 鐠?J. Smith et al." },
-      { title: "Quantum Error Correction at Scale", author: "Science 鐠?Team Google" }
+      { title: "A New Approach to Brain-Computer Interfaces", author: "Nature · J. Smith et al." },
+      { title: "Quantum Error Correction at Scale", author: "Science · Team Google" }
     ]
   },
   {
     id: "design",
-    title: "閻犱焦宕橀鎼佹倶閸偄濡?,
-    desc: "UI/UX 閻℃帒顑呮繛宥夊Υ娴ｇ懓绗撻柣妤€鐗忕欢銊р偓娑崇細缁楀矂宕氬☉娆忓鐎规悶鍎遍崣?,
+    title: "设计灵感",
+    desc: "UI/UX 趋势、排版美学与创意工具",
     category: "creative",
     icon: <Palette className="w-5 h-5" />,
     style: "minimal", 
@@ -177,8 +178,8 @@ interface Theme {
   },
   {
     id: "crypto",
-    title: "Web3 闁告挸绉甸柈?,
-    desc: "闁告牕鎼锟犳煣閻愵剙螚闁哄牜鍨埀顑跨婵偟鈧潧妫滈幓锝囨暜娴ｉ鐟㈤柛妯款唺閼垫垼绠涢崘銊ヮ嚙閹煎瓨姊婚弫?,
+    title: "Web3 前沿",
+    desc: "区块链技术、加密货币与去中心化应用",
     category: "tech",
     icon: <Bitcoin className="w-5 h-5" />,
     style: "finance",
@@ -197,8 +198,8 @@ interface Theme {
   },
   {
     id: "indie",
-    title: "闁绘瑯鍓涢悵娑橆嚕閳ь剟宕?,
-    desc: "濞戞挴鍋撳ù婊冩惈閸欐洟宕ｉ幖鐐╁亾娑撶嘲aS 闁哄瀚紓鎾寸▔鎼粹槅鏉婚梻鈧崸妤冩嫧閻?,
+    title: "独立开发",
+    desc: "一人公司、SaaS 构建与增长黑客",
     category: "tech",
     icon: <Code2 className="w-5 h-5" />,
     style: "tech",
@@ -209,15 +210,15 @@ interface Theme {
       "https://producthunt.com/feed"
     ],
     preview: [
-      { title: "Launch: AI-powered Notion Template", meta: "ProductHunt 鐠?#1" },
+      { title: "Launch: AI-powered Notion Template", meta: "ProductHunt · #1" },
       { title: "How I reached $10k MRR in 3 months", meta: "IndieHackers" },
       { title: "Stripe acquires new payment startup", meta: "TechCrunch" }
     ]
   },
   {
     id: "health",
-    title: "闁稿鍎遍幃宥夋偨閻斿憡銇?,
-    desc: "缂佸鍨甸鐔煎礂閼姐倖鏅搁柕鍡曠娴犳挳鐓锝呯樄闁告銇炵粭宀冪疀閸愵亝鍊為柛瀣ㄥ劚閹?,
+    title: "健康生活",
+    desc: "科学养生、健身指南与心理健康",
     category: "life",
     icon: <Activity className="w-5 h-5" />,
     style: "paper",
@@ -234,8 +235,8 @@ interface Theme {
   },
   {
     id: "psychology",
-    title: "閻犱降鍊楅悡陇绠涢崘顏呭€?,
-    desc: "闁规亽鍨婚崒銊﹀緞瑜戦崜铏附閵壯屾僵闁靛棔娴囬、鎴炵▔閾忓湱鐥呮繛鏉戦椤掔喐绋夋惔鈶╁亾濠靛牊妯婃俊顖椻偓宕団偓?,
+    title: "认知心理",
+    desc: "探索大脑奥秘、行为经济学与思维模型",
     category: "academic",
     icon: <BrainCircuit className="w-5 h-5" />,
     style: "minimal",
@@ -253,14 +254,15 @@ interface Theme {
 ];
 
 const CATEGORIES = [
-  { id: "all", label: "闁稿繈鍔戦崕? },
-  { id: "tech", label: "缂佸鍨舵俊褎绋夋惔鈩冩珜濞? },
-  { id: "creative", label: "闁告帗绋掗崜鐗堢▔鎼淬値鍟庨悹? },
-  { id: "life", label: "闁汇垻鍠愬鎸庣▔鎼粹€叉樊閹? },
-  { id: "academic", label: "閻庢冻闄勫﹢铏▔鎼淬垻绠掗幖? }
+  { id: "all", label: "全部" },
+  { id: "tech", label: "科技与商业" },
+  { id: "creative", label: "创意与设计" },
+  { id: "life", label: "生活与健康" },
+  { id: "academic", label: "学术与深度" }
 ];
 
-// 婵炴挸寮堕悡瀣▔瀹ュ懏鍊卞瀣閻楁悂鎯冮崟顖ｆ殨閻熸瑥鐗忕划宥嗙?const ThemePreview = ({ theme }: { theme: Theme }) => {
+// 渲染不同风格的预览组件
+const ThemePreview = ({ theme }: { theme: Theme }) => {
   switch (theme.style) {
     case "tech":
       return (
@@ -291,7 +293,7 @@ const CATEGORIES = [
             <div key={i} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
               <span className="font-bold text-white text-xs">{item.title}</span>
               <span className={`text-xs font-mono font-black ${item.trend === 'up' ? 'text-green-400' : 'text-red-400'}`}>
-                {item.trend === 'up' ? '闁? : '闁?} {item.value}
+                {item.trend === 'up' ? '▲' : '▼'} {item.value}
               </span>
             </div>
           ))}
@@ -361,7 +363,7 @@ const CATEGORIES = [
   }
 };
 
-function DashboardContent() {
+export default function Dashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -373,20 +375,24 @@ function DashboardContent() {
   const [selectedTheme, setSelectedTheme] = useState<any>(null);
   const [subscribedThemeIds, setSubscribedThemeIds] = useState<string[]>([]);
 
-  // 闁瑰吋绮庨崒銊╁椽鐏炶棄鐎荤紒顐ュ吹婵悂骞€?  const [searchQuery, setSearchQuery] = useState("");
+  // 搜索和分类状态
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
 
-  // 閻犱降鍨藉Σ鍕嚕閸︻厾宕堕柣妯垮煐閳?  const [isModalOpen, setIsModalOpen] = useState(false);
+  // 订阅弹窗状态
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState({
     webhookUrl: "",
     pushTime: "8",
     pushDays: [1, 2, 3, 4, 5] as number[]
   });
 
-  // 婵烇綀顕ф慨鐐烘嚊椤忓嫮鏆板☉鏂款槹缁喖顕ｉ崷顓犲炊闁绘鍩栭埀?  const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
+  // 添加自定义源弹窗状态
+  const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
   const [addSourceTargetThemeId, setAddSourceTargetThemeId] = useState<string | null>(null);
   const [newSourceUrl, setNewSourceUrl] = useState("");
-  // 閻庢稒锚閸嬪秴袙韫囧酣鍤嬪☉鎾愁煼椤ｄ粙鎯冮崟顔兼閻庤鐭粻鐔封攦?  const [customThemeSources, setCustomThemeSources] = useState<Record<string, string[]>>({});
+  // 存储每个主题的自定义源
+  const [customThemeSources, setCustomThemeSources] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     async function init() {
@@ -398,20 +404,22 @@ function DashboardContent() {
         setUsername(authData.username);
 
         const config = await fetchCurrentConfig();
-        // 閻?rssSources 闁轰焦澹嗙划宥嗘姜椤掍礁搴婂☉鎾虫惈閻⊙呯箔閿旇儻顩鐐舵硾閹酣鐛捄鍝勭厒 settings 濞?        const settingsWithRss = {
+        // 将 rssSources 数组转换为字符串并合并到 settings 中
+        const settingsWithRss = {
           ...(config.settings || {}),
           rssUrls: config.rssSources ? config.rssSources.join("\n") : ""
         };
         setSettings(settingsWithRss);
-        // 闁告帗绻傞～鎰板礌閺嵮冨殥閻犱降鍨藉Σ鍕▔婵犳凹鏆柛鎺擃殙閵?
+        // 初始化已订阅主题列表
         setSubscribedThemeIds(config.settings?.subscribedThemes || []);
-        // 闁告帗绻傞～鎰板礌閺嵮嗗墾缂佹劖顨婇崢銈囩磾?        setModalConfig({
+        // 初始化弹窗配置
+        setModalConfig({
           webhookUrl: config.settings?.webhookUrl || "",
           pushTime: config.settings?.pushTime || "8",
           pushDays: config.settings?.pushDays || [1, 2, 3, 4, 5]
         });
 
-        // 婵☆偀鍋撻柡?URL 闁告瑥鍊归弳?
+        // 检查 URL 参数
         const tabParam = searchParams.get('tab');
         if (tabParam === 'active') {
           setActiveTab('active');
@@ -428,18 +436,18 @@ function DashboardContent() {
   const handleThanks = async () => {
     setThanksLoading(true);
     try {
-      // 闁规亽鍔戦埀顑胯兌閸嬶絿鎸ч悙鎻掔厒闂傚啯瀵уΛ鎾儍?Webhook
+      // 推送点赞到阿旭的 Webhook
       await fetch("https://365.kdocs.cn/woa/api/v1/webhook/send?key=113a89749298fba10dcae6b7cb60db09", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           msg_type: "text",
-          content: { text: `妫ｅ啫鐨?闁规壆鍠曢梼鍧楁⒓閹稿孩锛旈柨娑楄兌閺併倝骞?[${username}] 闁告帗鑹鹃崹鐗堢▔鏉炴壆绋戦柣鎰扳偓娑氬晩濞戞挴鍋撳☉鎿冧海缁傛劙鏁嶇仦鎯уΤ閻犲婢€缂嶆﹢骞撻幇顏嗚繑闁汇劌瀚崢銈囨嫻?API 缂傚洤锕ラ惁娲晬娑?}
+          content: { text: `🌟 感谢阿旭！用户 [${username}] 刚刚为你点了一个赞，感谢你提供的免费 API 羊毛！` }
         })
       });
-      alert("闁绘劗顢婄粋鎰板箣閹邦剙顫犻柨娑楃閸戯繝鏌呭宕囩畺 Webhook 闁告稑锕ㄩ惁鏃堟⒓閹稿孩锛旈柛鐕佹础");
+      alert("点赞成功！已通过 Webhook 告诉阿旭啦~");
     } catch (e) {
-      alert("闁绘劗顢婄粋鎰緞鏉堫偉袝闁挎稑濂旂徊楣冩⒓閹稿孩锛旈柟鎵枎瑜板牓宕氭０浣哄晩濞达絿濮峰▓鎴ｇ疀閸愨晛澹堥柨?);
+      alert("点赞失败，但阿旭感受到了你的心意！");
     } finally {
       setThanksLoading(false);
     }
@@ -447,13 +455,13 @@ function DashboardContent() {
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 閺夆晜鐟╅崳閿嬫償閺冨浂鍤夐柡鍫濐槷缁斿瓨绋?loading 闁绘鍩栭埀顑跨筏缁辨繈寮抽崒娑欘槯闁活亙鑳堕弳?
+    // 这里应该有一个 loading 状态，暂时省略
     try {
       await persistSettings(settings);
-      alert("濞戞搩浜欏Ч澶嬬▔椤撶偟濡囬梺鏉跨Ф閻ゅ棗顔忛煫顓犵閻庢稒锕槐?);
+      alert("个人中心配置已保存！");
     } catch (error) {
       console.error("Failed to save settings:", error);
-      alert("濞ｅ洦绻傞悺銊﹀緞鏉堫偉袝闁挎稑鐭侀顒勬煂瀹ュ牏妲搁柕?);
+      alert("保存失败，请重试。");
     }
   };
 
@@ -477,7 +485,7 @@ function DashboardContent() {
 
   const openSubscribeModal = (theme: any) => {
     setSelectedTheme(theme);
-    // 濠碘€冲€归悘澶婎啅閸欏绠掗梺鏉跨Ф閻ゅ棝鏁嶇仦鐓庘枏闁活潿鍔庨獮鍥嫉婢舵劕甯崇紓鍐惧櫙缁遍亶宕ラ敃鈧崹顖涙媴鐠恒劍鏆忓娑欘焾椤?
+    // 如果已有配置，使用现有配置；否则使用默认
     setModalConfig({
       webhookUrl: settings.webhookUrl || "",
       pushTime: settings.pushTime || "8",
@@ -490,54 +498,58 @@ function DashboardContent() {
     if (!selectedTheme) return; // Add guard for selectedTheme
 
     if (!modalConfig.webhookUrl && !settings.webhookUrl) {
-      alert("閻犲洤鍢查敐鐐哄礃?Webhook 闁革附婢樺鍐╃閵夛箑澶嶉柡鈧懜闈涜吂闂?);
+      alert("请填写 Webhook 地址以接收推送");
       return;
     }
 
     setLoading(true);
     try {
-      // 1. 濞ｅ洦绻傞悺?RSS
+      // 1. 保存 RSS
       const currentSources = settings.rssUrls ? settings.rssUrls.split("\n").filter(Boolean) : [];
       
-      // 闁告艾鐗嗛懟鐔哥▔婵犳凹鏆娑欘焾椤撹鈹冮幇顒佸闁活潿鍔嶉崺娑㈡嚊椤忓嫮鏆板☉鏂款槹閸у﹪宕濋悩鍨暠婵?      const themeCustomSources = customThemeSources[selectedTheme.id] || [];
+      // 合并主题默认源和用户自定义添加的源
+      const themeCustomSources = customThemeSources[selectedTheme.id] || [];
       const allThemeSources = [...selectedTheme.sources, ...themeCustomSources];
 
       const newSources = Array.from(new Set([...currentSources, ...allThemeSources]));
       await persistRSS(newSources);
 
-      // 2. 濞ｅ洦绻傞悺銊ф媼閸撗呮瀭 (Webhook & Schedule) - 濞戞挸绉寸€垫﹢宕?rssUrls
+      // 2. 保存设置 (Webhook & Schedule) - 不包含 rssUrls
       const newSubscribedThemeIds = Array.from(new Set([...subscribedThemeIds, selectedTheme.id]));
       const newSettingsForSave = {
         ...settings,
         webhookUrl: modalConfig.webhookUrl || settings.webhookUrl,
         pushTime: modalConfig.pushTime,
         pushDays: modalConfig.pushDays,
-        subscribedThemes: newSubscribedThemeIds, // 濞ｅ洦绻傞悺銊ф媼閵忋倖顫夐柣銊ュ鐎靛本锛愬Δ鐠傞柛鎺擃殙閵?
-        // 缁绢収鍠曠换姘跺礂閺堢數閾傞煫鍥ф嚀椤╋妇鈧稒顨嗛宀€鈧稒锚濠€?
+        subscribedThemes: newSubscribedThemeIds, // 保存订阅的主题ID列表
+        // 确保其他必要字段存在
         aiProvider: settings.aiProvider || "google",
         configMode: settings.configMode || "simple"
       };
-      delete (newSettingsForSave as any).rssUrls; // 闁告帞濞€濞?rssUrls 闂侇剙鐏濋崢銈団偓娑櫭崣?settings
+      delete (newSettingsForSave as any).rssUrls; // 删除 rssUrls 避免存入 settings
       await persistSettings(newSettingsForSave);
       
-      // 3. 闁哄洤鐡ㄩ弻濠囧嫉椤掆偓濠€鎾偐閼哥鍋撴笟濠勭闁告牕鎳庨幆?rssUrls 闁活潿鍔嬬花顒勫礈瀹ュ浂浼傞柡鍕⒔閵囨岸鏁?      const newSettings = {
+      // 3. 更新本地状态（包含 rssUrls 用于前端显示）
+      const newSettings = {
         ...newSettingsForSave,
         rssUrls: newSources.join("\n")
       };
       setSettings(newSettings);
       setSubscribedThemeIds(newSubscribedThemeIds);
       setIsModalOpen(false);
-      alert(`妫ｅ啫绔?閻犱降鍨藉Σ鍕箣閹邦剙顫犻柨娑楃閸戔剝绋夐悜妯轰憾婵烇綀顕ф慨?[${selectedTheme.title}] 闁告帗濯介褰掓⒓閸涱厼鐏欓悶娑栧妸閳ь兛绻?;
+      alert(`🎉 订阅成功！已为您添加 [${selectedTheme.title}] 到订阅列表。`);
       
-      // 闁告帡鏀遍弻濠冦亜閻㈠憡妗ㄩ柟瀛樼墳閻戯附娼?      // router.refresh(); // 闁告瑯鍨堕埀?    } catch (error) {
+      // 刷新页面或跳转
+      // router.refresh(); // 可选
+    } catch (error) {
       console.error("Subscription failed:", error);
-      alert("閻犱降鍨藉Σ鍕緞鏉堫偉袝闁挎稑鐭侀顒勬煂瀹ュ牏妲?);
+      alert("订阅失败，请重试");
     } finally {
       setLoading(false);
     }
   };
 
-  // 閺夆晛娲﹂幎銈嗙▔婵犳凹鏆梺顐ｆ缁?
+  // 过滤主题逻辑
   const filteredThemes = PRESET_THEMES.filter(theme => {
     const matchesSearch = theme.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           theme.desc.toLowerCase().includes(searchQuery.toLowerCase());
@@ -549,16 +561,16 @@ function DashboardContent() {
 
   return (
     <div className="min-h-screen text-white font-sans selection:bg-blue-500/30 selection:text-white overflow-x-hidden relative">
-      {/* 濡炪倕鐖奸崕瀵糕偓浣冨閸?*/}
+      {/* 顶部导航 */}
       <header className="sticky top-0 z-50 bg-[#030712]/80 backdrop-blur-xl border-b border-white/10 supports-[backdrop-filter]:bg-[#030712]/60 px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3 cursor-pointer group" onClick={() => router.push("/home")}>
           <span className="text-xl font-black tracking-tighter font-serif text-white drop-shadow-md">Weave</span>
         </div>
         <div className="flex items-center gap-6">
           <nav className="hidden md:flex items-center bg-white/10 p-1 rounded-2xl border border-white/10 backdrop-blur-sm">
-            <button onClick={() => setActiveTab('shelf')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'shelf' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>濞戞挸顭烽。鐣屾嫻瑜庨悘?/button>
-            <button onClick={() => setActiveTab('active')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'active' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>鐎规瓕灏褰掓⒓?/button>
-            <button onClick={() => setActiveTab('settings')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'settings' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>濞戞搩浜欏Ч澶嬬▔椤撶偟濡?/button>
+            <button onClick={() => setActiveTab('shelf')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'shelf' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>主题货架</button>
+            <button onClick={() => setActiveTab('active')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'active' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>已订阅</button>
+            <button onClick={() => setActiveTab('settings')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'settings' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>个人中心</button>
           </nav>
           <div className="h-8 w-px bg-white/10 mx-2" />
           <div className="flex items-center gap-3">
@@ -594,8 +606,8 @@ function DashboardContent() {
                         {selectedTheme.icon}
                       </div>
                       <div>
-                        <h3 className="text-2xl font-black text-blue-950">閻犱降鍨藉Σ鍕煀瀹ュ洨鏋?/h3>
-                        <p className="text-xs text-blue-900/40 font-bold mt-1 uppercase tracking-widest">濞戞挸顭烽。浠嬫晬濮濈府electedTheme.title}</p>
+                        <h3 className="text-2xl font-black text-blue-950">订阅配置</h3>
+                        <p className="text-xs text-blue-900/40 font-bold mt-1 uppercase tracking-widest">主题：{selectedTheme.title}</p>
                       </div>
                     </div>
                     <button onClick={() => setIsModalOpen(false)} className="p-3 bg-white/5 rounded-full hover:bg-white/10 transition-colors border border-white/10">
@@ -604,24 +616,24 @@ function DashboardContent() {
                   </div>
 
                   <div className="space-y-8">
-                    {/* Webhook 闂佹澘绉堕悿?(濞寸姴鎳庣紞瀣嫉椤忓牆甯崇紓鍐惧枟濡炲倿寮伴崜褋浠? */}
+                    {/* Webhook 配置 (仅当未配置时显示) */}
                     {!settings.webhookUrl && (
                       <div className="space-y-3">
-                        <label className="text-xs font-black text-blue-900/30 uppercase tracking-widest ml-1 block">Webhook 闁革附婢樺?(闊洤鎳庨敐?</label>
+                        <label className="text-xs font-black text-blue-900/30 uppercase tracking-widest ml-1 block">Webhook 地址 (必填)</label>
                         <input 
                           type="text" 
                           value={modalConfig.webhookUrl}
                           onChange={(e) => setModalConfig(prev => ({ ...prev, webhookUrl: e.target.value }))}
-                          placeholder="閻犲洨鏌夌欢顓㈠礂閵夛附绨氶柛锝冨妺濮?Webhook 闁革附婢樺?
+                          placeholder="请输入机器人 Webhook 地址"
                           className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-blue-900/20"
                         />
-                        <p className="text-[10px] text-blue-900/20 ml-1 font-medium">濡絾鐗楅鑲╂媼閵忋倖顫夐梻鍥ｅ亾闂佹澘绉堕悿鍡涘箳閵夛附鏆柛锔芥緲濞煎啴鏁嶇仦鑺ュ€电紓渚囧幖瑜版煡鎯勭€涙ê澶嶅璺虹Ф閺併倝濡?/p>
+                        <p className="text-[10px] text-blue-900/20 ml-1 font-medium">首次订阅需配置接收地址，后续可直接复用。</p>
                       </div>
                     )}
 
-                    {/* 闁规亽鍔戦埀顑跨劍濡炲倿姊?*/}
+                    {/* 推送时间 */}
                     <div className="space-y-3">
-                      <label className="text-xs font-black text-blue-900/20 uppercase tracking-widest ml-1 block">婵絽绻戝Λ鈺呭箳閵娾斁鍋撴担瑙勵槯闂?/label>
+                      <label className="text-xs font-black text-blue-900/20 uppercase tracking-widest ml-1 block">每日推送时间</label>
                       <div className="grid grid-cols-6 gap-2">
                         {Array.from({ length: 24 }).map((_, i) => (
                           <button 
@@ -635,11 +647,11 @@ function DashboardContent() {
                       </div>
                     </div>
 
-                    {/* 闁规亽鍔戦埀顑跨閹冲棝寮?*/}
+                    {/* 推送周期 */}
                     <div className="space-y-3">
-                      <label className="text-xs font-black text-blue-900/20 uppercase tracking-widest ml-1 block">闁规亽鍔戦埀顑跨閹冲棝寮?/label>
+                      <label className="text-xs font-black text-blue-900/20 uppercase tracking-widest ml-1 block">推送周期</label>
                       <div className="flex flex-wrap gap-2">
-                        {[{ label: "闁告稏鍔嬬粩?, val: 1 }, { label: "闁告稏鍔嬬花?, val: 2 }, { label: "闁告稏鍔嬬粭?, val: 3 }, { label: "闁告稏鍔屽ú?, val: 4 }, { label: "闁告稏鍔嬬花?, val: 5 }, { label: "闁告稏鍔岄崣?, val: 6 }, { label: "闁告稏鍔嶅Λ?, val: 0 }].map((day) => (
+                        {[{ label: "周一", val: 1 }, { label: "周二", val: 2 }, { label: "周三", val: 3 }, { label: "周四", val: 4 }, { label: "周五", val: 5 }, { label: "周六", val: 6 }, { label: "周日", val: 0 }].map((day) => (
                           <button 
                             key={day.val} 
                             onClick={() => { 
@@ -663,7 +675,7 @@ function DashboardContent() {
                     {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (
                       <>
                         <CheckCircle2 className="w-6 h-6" />
-                        缁绢収鍠涢鑽ゆ媼閵忋倖顫?
+                        确认订阅
                       </>
                     )}
                   </button>
@@ -685,14 +697,14 @@ function DashboardContent() {
               >
                 <div className="p-10 space-y-8">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-2xl font-black text-blue-950 uppercase tracking-tighter">婵烇綀顕ф慨?RSS 婵?/h3>
+                    <h3 className="text-2xl font-black text-blue-950 uppercase tracking-tighter">添加 RSS 源</h3>
                     <button onClick={() => setIsAddSourceModalOpen(false)} className="p-3 bg-white/5 rounded-full hover:bg-white/10 transition-colors border border-white/10">
                       <X className="w-5 h-5 text-blue-900/30" />
                     </button>
                   </div>
                   
                   <div className="space-y-3">
-                    <label className="text-xs font-black text-blue-900/30 uppercase tracking-widest ml-1 block">RSS 闂佸墽鍋撶敮?/label>
+                    <label className="text-xs font-black text-blue-900/30 uppercase tracking-widest ml-1 block">RSS 链接</label>
                     <input 
                       type="text" 
                       value={newSourceUrl}
@@ -708,7 +720,7 @@ function DashboardContent() {
                     className="w-full py-5 bg-blue-600 text-white rounded-[24px] font-black text-xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-3 disabled:bg-gray-100 disabled:shadow-none disabled:text-gray-400"
                   >
                     <Plus className="w-6 h-6" />
-                    缁绢収鍠涢璇睬庣拠鎻掝潱
+                    确认添加
                   </button>
                 </div>
               </motion.div>
@@ -723,16 +735,16 @@ function DashboardContent() {
               className="space-y-12"
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">闂侇偄顦扮€氥劍鎷呴悩鎻掑綘婵炲鍔庡▓鎴炵▔婵犳凹鏆?/h2>
+                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">选择你关注的主题</h2>
               </div>
 
-              {/* 闁瑰吋绮庨崒銊╁椽鐏炶棄鐎荤紒顐ょ帛閻?*/}
+              {/* 搜索和分类栏 */}
               <div className="space-y-8 bg-white/10 p-8 rounded-[40px] border border-white/10 backdrop-blur-md shadow-2xl ring-1 ring-white/5">
                 <div className="relative group">
                   <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-7 h-7 text-white/40 group-focus-within:text-white transition-colors" />
                   <input 
                     type="text" 
-                    placeholder="闁瑰吋绮庨崒銊╁箛閻斿嘲褰洪悺鎺炵悼濞堟垶绋夋繝姘兼毌闁挎稑鐗嗛々褔鏁嶅▎鐧愰柕鍡曟祰椤旀洜鎷嬫幊閳ь兛娴囬崒銊х磼?..闁? 
+                    placeholder="搜索感兴趣的主题（如：AI、设计、财经...）" 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full bg-white/10 border border-white/10 rounded-[24px] pl-16 pr-8 py-6 text-lg outline-none focus:ring-2 focus:ring-blue-400 transition-all font-medium text-white placeholder:text-white/20"
@@ -765,7 +777,7 @@ function DashboardContent() {
                     className="break-inside-avoid group relative flex flex-col"
                   >
                     <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-blue-400/30 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5">
-                      {/* 濠㈣埖鎸抽崕瀛樼┍閳╁啩绱?*/}
+                      {/* 头部信息 */}
                       <div className="flex items-center justify-between mb-8">
                         <div className="flex items-center gap-4">
                           <div className={`p-3.5 bg-white/10 rounded-2xl text-blue-300 border border-white/10 group-hover:bg-white group-hover:text-blue-950 transition-all duration-500`}>
@@ -777,11 +789,11 @@ function DashboardContent() {
                           onClick={() => openSubscribeModal(theme)}
                           className="px-5 py-2.5 bg-white text-blue-950 text-sm font-bold rounded-full opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0 shadow-lg hover:scale-105"
                         >
-                          閻犱降鍨藉Σ?
+                          订阅
                         </button>
                       </div>
 
-                      {/* 鐎瑰壊鍠栫槐鎾诲礌閺嶎収鏆曢悷娆忕墢缁秵绂?*/}
+                      {/* 差异化预览组件 */}
                       <div className="mb-8">
                         <ThemePreview theme={theme} />
                       </div>
@@ -794,7 +806,7 @@ function DashboardContent() {
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-2">
                             <Rss className="w-4 h-4 text-blue-100/50" />
-                            <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">闁告牕鎳庨幆?{theme.sources.length + (customThemeSources[theme.id]?.length || 0)} 濞戞搩浜欐穱濠傗攦?/span>
+                            <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">包含 {theme.sources.length + (customThemeSources[theme.id]?.length || 0)} 个信源</span>
                           </div>
                           <button 
                             onClick={(e) => {
@@ -804,7 +816,8 @@ function DashboardContent() {
                             className="flex items-center gap-1.5 text-[10px] font-black text-blue-300 hover:text-blue-200 bg-blue-500/20 px-3 py-1.5 rounded-xl transition-colors uppercase tracking-widest"
                           >
                             <Plus className="w-3.5 h-3.5" />
-                            婵烇綀顕ф慨鐐测攦?                          </button>
+                            添加源
+                          </button>
                         </div>
                         <div className="flex flex-wrap gap-2.5">
                           {theme.sources.slice(0, 3).map((source: string, idx: number) => (
@@ -819,7 +832,7 @@ function DashboardContent() {
                   </motion.div>
                 ))}
                 
-                {/* 闁煎浜為弫閬嶆煀瀹ュ洨鏋傞柛蹇嬪劚瑜?*/}
+                {/* 自由配置入口 */}
                 <div 
                   onClick={() => router.push("/config")}
                   className="break-inside-avoid cursor-pointer group"
@@ -829,8 +842,8 @@ function DashboardContent() {
                       <Plus className="w-8 h-8" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-white font-serif italic">闁煎浜為弫閬嶆煀瀹ュ洨鏋傛俊顖椻偓宕囩</h3>
-                      <p className="text-sm text-blue-100/50 mt-2 font-bold uppercase tracking-widest">闁煎浜滈悾鐐▕婢跺浜堕柣銊ュ缁楁挾浠﹂悙鏉戝壈闁硅翰鍎茬粊?/p>
+                      <h3 className="text-xl font-black text-white font-serif italic">自由配置模式</h3>
+                      <p className="text-sm text-blue-100/50 mt-2 font-bold uppercase tracking-widest">自定义您的专属情报流</p>
                     </div>
                   </div>
                 </div>
@@ -844,15 +857,15 @@ function DashboardContent() {
               className="space-y-12"
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">鐎规瓕灏褰掓⒓閸涱剙鐦滃Λ?/h2>
+                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">已订阅主题</h2>
                 <button onClick={() => router.push("/config")} className="flex items-center gap-3 text-blue-600 font-black text-sm uppercase tracking-[0.2em] hover:text-blue-700 transition-colors group">
-                  闁哄倹婢橀·鍐嚊椤忓嫮鏆板☉鏂款樀閸樸倗绱?<Settings2 className="w-5 h-5 group-hover:rotate-90 transition-transform duration-500" />
+                  新增自定义配置 <Settings2 className="w-5 h-5 group-hover:rotate-90 transition-transform duration-500" />
                 </button>
               </div>
 
               {subscribedThemeIds.length > 0 || settings.rssUrls ? (
                 <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
-                  {/* 鐎规瓕灏褰掓⒓閸涱剙鐦滃Λ鐗埫畷閬嶆偋?*/}
+                  {/* 已订阅主题卡片 */}
                   {subscribedThemeIds.map((themeId) => {
                     const theme = PRESET_THEMES.find(t => t.id === themeId);
                     if (!theme) return null;
@@ -866,11 +879,12 @@ function DashboardContent() {
                         className="break-inside-avoid group relative flex flex-col"
                       >
                         <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-blue-500/20 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5">
-                          {/* 鐎规瓕灏褰掓⒓閸涱喚鍨肩紒?*/}
+                          {/* 已订阅标签 */}
                           <div className="absolute top-6 right-6 px-4 py-1.5 bg-green-500/20 text-green-300 text-[10px] font-black rounded-full border border-green-500/30 uppercase tracking-widest">
-                            鐎规瓕灏褰掓⒓?                          </div>
+                            已订阅
+                          </div>
                           
-                          {/* 濠㈣埖鎸抽崕瀛樼┍閳╁啩绱?*/}
+                          {/* 头部信息 */}
                           <div className="flex items-center gap-4 mb-8">
                             <div className="p-3.5 bg-white/10 rounded-2xl text-blue-600 border border-white/10 group-hover:bg-white group-hover:text-blue-950 transition-all duration-500">
                               {theme.icon}
@@ -878,7 +892,7 @@ function DashboardContent() {
                             <h3 className="text-xl font-black text-white font-serif">{theme.title}</h3>
                           </div>
 
-                          {/* 鐎瑰壊鍠栫槐鎾诲礌閺嶎収鏆曢悷娆忕墢缁秵绂?*/}
+                          {/* 差异化预览组件 */}
                           <div className="mb-8">
                             <ThemePreview theme={theme} />
                           </div>
@@ -891,7 +905,7 @@ function DashboardContent() {
                             <div className="flex items-center justify-between mb-4">
                               <div className="flex items-center gap-2">
                                 <Rss className="w-4 h-4 text-blue-100/50" />
-                                <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">闁告牕鎳庨幆?{allSources.length} 濞戞搩浜欐穱濠傗攦?/span>
+                                <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">包含 {allSources.length} 个信源</span>
                               </div>
                             </div>
                             <div className="flex flex-wrap gap-2.5">
@@ -908,7 +922,7 @@ function DashboardContent() {
                     );
                   })}
                   
-                  {/* 闁煎浜滈悾鐐▕?RSS 婵犙勫姧缁辨瑦绋夊鍛剑濞存粌绨奸幑銏℃媴閺囨艾鐦滃Λ鐗堫焽濞堟垿鏁?*/}
+                  {/* 自定义 RSS 源（不属于任何主题的） */}
                   {(() => {
                     const allThemesSources = subscribedThemeIds.flatMap(id => {
                       const theme = PRESET_THEMES.find(t => t.id === id);
@@ -929,8 +943,8 @@ function DashboardContent() {
                               <Plus className="w-5 h-5" />
                             </div>
                             <div>
-                              <h3 className="text-xl font-black text-white font-serif">闁煎浜滈悾鐐▕婢跺鐖?/h3>
-                              <p className="text-xs text-blue-100/60 font-bold uppercase tracking-widest mt-1">{customRssSources.length} 濞戞搩浜欐穱濠傗攦?/p>
+                              <h3 className="text-xl font-black text-white font-serif">自定义源</h3>
+                              <p className="text-xs text-blue-100/60 font-bold uppercase tracking-widest mt-1">{customRssSources.length} 个信源</p>
                             </div>
                           </div>
                           
@@ -942,7 +956,7 @@ function DashboardContent() {
                               </div>
                             ))}
                             {customRssSources.length > 5 && (
-                              <p className="text-[10px] text-blue-100/50 font-black uppercase tracking-widest text-center pt-2">閺夆晜蓱濠€?{customRssSources.length - 5} 濞戞搩浜濆ú鎸庡緞濮橆厾鐖?..</p>
+                              <p className="text-[10px] text-blue-100/50 font-black uppercase tracking-widest text-center pt-2">还有 {customRssSources.length - 5} 个更多源...</p>
                             )}
                           </div>
                         </div>
@@ -955,8 +969,8 @@ function DashboardContent() {
                   <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-8 border border-white/10">
                     <Rss className="w-10 h-10 text-blue-200/20" />
                   </div>
-                  <p className="text-blue-200/70 font-bold text-xl mb-10 uppercase tracking-[0.2em]">闁诡喓鍔忕换鏇炩柦閳╁啯绠掗悹浣靛灲濡插嫭绂掔拋宕囩Э濞戞挸顭烽。?/p>
-                  <button onClick={() => setActiveTab('shelf')} className="px-12 py-5 bg-white text-blue-950 rounded-[24px] font-black text-xl shadow-2xl shadow-white/5 hover:scale-105 transition-all">闁告顔婄€靛本锛愬Ο鎸庡經闁哄澧庡﹢鍛存儑?/button>
+                  <p className="text-blue-200/70 font-bold text-xl mb-10 uppercase tracking-[0.2em]">您还没有订阅任何主题</p>
+                  <button onClick={() => setActiveTab('shelf')} className="px-12 py-5 bg-white text-blue-950 rounded-[24px] font-black text-xl shadow-2xl shadow-white/5 hover:scale-105 transition-all">去主题货架看看</button>
                 </div>
               )}
             </motion.div>
@@ -968,42 +982,42 @@ function DashboardContent() {
               className="max-w-3xl mx-auto space-y-12"
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">濞戞搩浜欏Ч澶嬬▔椤撶偟濡?/h2>
+                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">个人中心</h2>
                 <button 
                   onClick={() => document.getElementById('settings-form')?.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }))}
                   className="px-8 py-3 bg-white text-blue-950 rounded-full font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-white/10"
                 >
-                  濞ｅ洦绻傞悺銊ф媼閸撗呮瀭
+                  保存设置
                 </button>
               </div>
               
               <form id="settings-form" onSubmit={handleSaveSettings} className="space-y-10">
-                {/* Webhook 闂佹澘绉堕悿?*/}
+                {/* Webhook 配置 */}
                 <div className="bg-white/10 rounded-[40px] border border-white/10 p-10 shadow-2xl backdrop-blur-md ring-1 ring-white/5 space-y-8">
                   <div className="flex items-center gap-5">
                     <div className="p-4 bg-white/10 rounded-2xl text-blue-300 border border-white/10"><Bell className="w-7 h-7" /></div>
-                    <h3 className="text-2xl font-black text-white font-serif">闁规亽鍔戦埀顑挎祰椤旀洜绱?/h3>
+                    <h3 className="text-2xl font-black text-white font-serif">推送设置</h3>
                   </div>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-xs font-black text-white uppercase tracking-widest ml-1 mb-3 block">Webhook 闁革附婢樺?/label>
+                      <label className="text-xs font-black text-white uppercase tracking-widest ml-1 mb-3 block">Webhook 地址</label>
                       <input 
                         type="text" 
                         value={settings.webhookUrl || ""} 
                         onChange={(e) => setSettings({...settings, webhookUrl: e.target.value})}
-                        placeholder="閻犲洨鏌夌欢顓㈠礂閵夛附绨氶柛锝冨妺濮?Webhook 闁革附婢樺?
+                        placeholder="请输入机器人 Webhook 地址"
                         className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-base outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/30"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* API 闁绘鍩栭埀?*/}
+                {/* API 状态 */}
                 <div className="bg-white/10 rounded-[40px] border border-white/10 p-10 shadow-2xl backdrop-blur-md ring-1 ring-white/5 space-y-8">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-5">
                       <div className="p-4 bg-white/10 rounded-2xl text-blue-300 border border-white/10"><Zap className="w-7 h-7" /></div>
-                      <h3 className="text-2xl font-black text-white font-serif">AI 鐎殿喗娲橀幖鎼佹煀瀹ュ洨鏋?/h3>
+                      <h3 className="text-2xl font-black text-white font-serif">AI 引擎配置</h3>
                     </div>
                     {(!settings.geminiApiKey && !settings.openaiApiKey) && (
                       <button 
@@ -1012,7 +1026,7 @@ function DashboardContent() {
                         className="px-5 py-2.5 bg-blue-500/20 text-blue-300 rounded-xl font-black text-[10px] hover:bg-blue-500/30 transition-all flex items-center gap-2 border border-blue-500/30 uppercase tracking-widest"
                       >
                         {thanksLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Heart className="w-3.5 h-3.5 fill-current" />}
-                        濞达綀娉曢弫銈夊礂瀹ュ牆鐎?API (闁规壆鍠曢梼鍧楁⒓閹稿孩锛?
+                        使用免费 API (感谢阿旭)
                       </button>
                     )}
                   </div>
@@ -1020,7 +1034,7 @@ function DashboardContent() {
                   <div className="space-y-6">
                     <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/5">
                       <button type="button" onClick={() => setSettings({...settings, aiProvider: 'google'})} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${settings.aiProvider === 'google' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/40 hover:text-white'}`}>Google Gemini</button>
-                      <button type="button" onClick={() => setSettings({...settings, aiProvider: 'openai'})} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${settings.aiProvider === 'openai' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/40 hover:text-white'}`}>OpenAI / 闁稿繒鍘ч鎰扮嵁閸愭彃閰?/button>
+                      <button type="button" onClick={() => setSettings({...settings, aiProvider: 'openai'})} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${settings.aiProvider === 'openai' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/40 hover:text-white'}`}>OpenAI / 兼容平台</button>
                     </div>
 
                     {settings.aiProvider === 'google' ? (
@@ -1030,7 +1044,7 @@ function DashboardContent() {
                           type="password" 
                           value={settings.geminiApiKey || ""} 
                           onChange={(e) => setSettings({...settings, geminiApiKey: e.target.value})}
-                          placeholder="闁伙絾鐟ч埞鏍礆濞嗗骸鈻忛柣顫妼閸樸倗鎷硅ぐ鎺濇澓閹?
+                          placeholder="留空则使用免费额度"
                           className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-base outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/30"
                         />
                       </div>
@@ -1072,7 +1086,7 @@ function DashboardContent() {
                   </div>
                 </div>
 
-                {/* 閹煎瓨娲熼崕鎾箰婢舵劖灏︾紒澶婎煼濞呭酣鏁嶇仦钘夊殥缂佸妲掗崵锔姐亜閸洖鍔?*/}
+                {/* 底部按钮移除，已移至顶部 */}
               </form>
             </motion.div>
           )}
@@ -1081,5 +1095,3 @@ function DashboardContent() {
     </div>
   );
 }
-
-export default function Dashboard() { return ( <Suspense fallback={<div className=" \min-h-screen flex items-center justify-center bg-transparent\\><Loader2 className=\\w-12 h-12 animate-spin text-white\\ /></div>}><DashboardContent /></Suspense> ); }
