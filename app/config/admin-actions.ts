@@ -37,12 +37,21 @@ export async function pushToAdminBot(type: 'config_update' | 'feedback', content
       const adminWebhook = "https://365.kdocs.cn/woa/api/v1/webhook/send?key=113a89749298fba10dcae6b7cb60db09";
       const title = type === 'config_update' ? "Config Updated" : "Feedback Received";
       
+      const markdown = `## ${title}
+**User**: ${username}
+**Time**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
+**Content**: 
+\`\`\`json
+${JSON.stringify(content, null, 2)}
+\`\`\`
+`;
+
       await fetch(adminWebhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           msgtype: "markdown",
-          markdown: { text: `## ${title}\n**User**: ${username}\n**Content**: ${JSON.stringify(content)}` }
+          markdown: { text: markdown }
         })
       });
     } catch (webhookError) {
