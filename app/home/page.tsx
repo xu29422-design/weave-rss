@@ -27,10 +27,10 @@ const MobileScene = () => {
               </div>
               <div>
                 <div className="text-sm font-bold text-white leading-none mb-1">Weave 协作群</div>
-                <div className="text-[10px] text-white/60">1,240 成员</div>
+                <div className="text-[10px] text-white/80">1,240 成员</div>
               </div>
             </div>
-            <MoreHorizontal className="w-5 h-5 text-white/60" />
+            <MoreHorizontal className="w-5 h-5 text-white/80" />
           </div>
 
           {/* 聊天区域 */}
@@ -40,7 +40,7 @@ const MobileScene = () => {
 
             {/* 时间戳 */}
             <div className="text-center">
-              <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-white/60">09:00 AM</span>
+              <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-white/80">09:00 AM</span>
             </div>
 
             {/* 消息 1: 机器人推送 */}
@@ -54,8 +54,8 @@ const MobileScene = () => {
                 <Bot className="w-4 h-4 text-white" />
               </div>
               <div className="space-y-2 max-w-[85%]">
-                <div className="text-[10px] text-white/60 ml-1">AI 情报助理</div>
-                <div className="bg-[#374151] p-3 rounded-2xl rounded-tl-none border border-white/10 text-xs text-blue-50/90 leading-relaxed shadow-md">
+                <div className="text-[10px] text-white/80 ml-1">AI 情报助理</div>
+                <div className="bg-[#374151] p-3 rounded-2xl rounded-tl-none border border-white/10 text-xs text-blue-50 leading-relaxed shadow-md">
                   早上好！☀️ 今日为您聚合了 <span className="text-blue-300 font-bold">15 条</span> 高价值情报。
                 </div>
                 {/* 简报卡片 */}
@@ -69,7 +69,7 @@ const MobileScene = () => {
                     <div className="absolute top-0 right-0 p-2 opacity-20">
                       <Sparkles className="w-12 h-12 text-white" />
                     </div>
-                    <div className="text-[10px] font-bold text-white/80 mb-0.5 uppercase tracking-wider">Daily Digest</div>
+                    <div className="text-[10px] font-bold text-white/90 mb-0.5 uppercase tracking-wider">Daily Digest</div>
                     <div className="text-sm font-bold text-white">AI 行业深度观察</div>
                   </div>
                   <div className="p-3 bg-[#374151] border-t border-white/5">
@@ -77,11 +77,11 @@ const MobileScene = () => {
                       <span className="text-[10px] bg-blue-500/20 text-blue-200 px-1.5 py-0.5 rounded">GPT-5</span>
                       <span className="text-[10px] bg-purple-500/20 text-purple-200 px-1.5 py-0.5 rounded">Agent</span>
                     </div>
-                    <div className="text-[11px] text-white/80 line-clamp-2 leading-relaxed">
+                    <div className="text-[11px] text-white/90 line-clamp-2 leading-relaxed">
                       DeepSeek 开源新一代 MoE 架构；OpenAI 首席科学家谈 AGI 路线图...
                     </div>
                     <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between">
-                      <span className="text-[10px] text-white/40">刚刚</span>
+                      <span className="text-[10px] text-white/60">刚刚</span>
                       <span className="text-[10px] text-blue-300 font-bold flex items-center gap-1">阅读全文 <ChevronRight className="w-3 h-3" /></span>
                     </div>
                   </div>
@@ -107,8 +107,8 @@ const MobileScene = () => {
 
           {/* 底部输入框 */}
           <div className="h-14 bg-[#374151] border-t border-white/5 px-4 flex items-center gap-3">
-            <Paperclip className="w-5 h-5 text-white/60" />
-            <div className="flex-1 h-8 bg-black/20 rounded-full border border-white/5" />
+            <Paperclip className="w-5 h-5 text-white/80" />
+            <div className="flex-1 h-8 bg-black/40 rounded-full border border-white/5" />
             <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
               <Send className="w-4 h-4 text-white" />
             </div>
@@ -132,7 +132,7 @@ const DesktopScene = () => {
             <div className="w-3 h-3 rounded-full bg-[#febc2e] border border-[#d89e24]" />
             <div className="w-3 h-3 rounded-full bg-[#28c840] border border-[#1aab29]" />
           </div>
-          <div className="flex-1 text-center text-[10px] font-bold text-white/40">Mail - Inbox</div>
+          <div className="flex-1 text-center text-[10px] font-bold text-white/70">Mail - Inbox</div>
         </div>
 
         {/* 主体内容 */}
@@ -140,7 +140,7 @@ const DesktopScene = () => {
           {/* 左侧列表 */}
           <div className="w-1/3 bg-[#1f2937] border-r border-white/5 flex flex-col">
             <div className="p-3 border-b border-white/5">
-              <div className="text-[10px] font-bold text-white/60 mb-2 uppercase tracking-wider">Inbox</div>
+              <div className="text-[10px] font-bold text-white/80 mb-2 uppercase tracking-wider">Inbox</div>
               <motion.div 
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -151,13 +151,13 @@ const DesktopScene = () => {
                   <span className="text-[10px] font-bold text-white">Weave</span>
                   <span className="text-[9px] text-blue-300">09:00</span>
                 </div>
-                <div className="text-[10px] text-blue-100/80 truncate">Today's AI Digest...</div>
+                <div className="text-[10px] text-blue-50 truncate">Today's AI Digest...</div>
               </motion.div>
               
               {[1, 2, 3].map((i) => (
                 <div key={i} className="mt-2 p-2 rounded-lg opacity-40 hover:bg-white/5 transition-colors">
-                  <div className="w-2/3 h-2 bg-white/10 rounded mb-1.5" />
-                  <div className="w-full h-1.5 bg-white/5 rounded" />
+                  <div className="w-2/3 h-2 bg-white/20 rounded mb-1.5" />
+                  <div className="w-full h-1.5 bg-white/10 rounded" />
                 </div>
               ))}
             </div>
@@ -173,10 +173,10 @@ const DesktopScene = () => {
                   </div>
                   <div>
                     <div className="text-sm font-bold text-white">Weave Intelligence</div>
-                    <div className="text-[10px] text-white/60">to: me@example.com</div>
+                    <div className="text-[10px] text-white/80">to: me@example.com</div>
                   </div>
                 </div>
-                <div className="flex gap-2 text-white/20">
+                <div className="flex gap-2 text-white/50">
                   <Star className="w-4 h-4" />
                   <MoreHorizontal className="w-4 h-4" />
                 </div>
@@ -205,7 +205,7 @@ const DesktopScene = () => {
                       initial={{ opacity: 0, x: 10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.8 + idx * 0.3 }}
-                      className="text-xs text-blue-50/90 leading-relaxed pl-3 border-l-2 border-blue-500/30"
+                      className="text-xs text-blue-50 leading-relaxed pl-3 border-l-2 border-blue-500/30"
                     >
                       {line}
                     </motion.div>
@@ -381,7 +381,7 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-6 pt-4 border-t border-white/10">
-              <span className="text-sm font-bold text-blue-50/80">支持全平台接收：</span>
+              <span className="text-sm font-bold text-blue-50">支持全平台接收：</span>
               <div className="flex items-center gap-4 text-blue-50">
                 <div className="flex items-center gap-1.5 hover:text-cyan-200 transition-colors">
                   <Mail className="w-4 h-4" />
@@ -461,7 +461,7 @@ export default function Home() {
                       <><Mail className="w-5 h-5 text-purple-400" /> 沉浸式日报 · 深度阅读</>
                     )}
                   </h3>
-                  <p className="text-sm text-blue-100/50 font-medium">
+                  <p className="text-sm text-blue-50 font-medium">
                     {activeScene === "mobile" 
                       ? "WPS / 微信 / 飞书，团队信息零时差同步" 
                       : "像阅读晨报一样，享受 AI 为你定制的知识盛宴"
@@ -483,7 +483,7 @@ export default function Home() {
       {/* 信源背书条幅 */}
       <section className="relative z-10 w-full py-24 border-y border-white/10 bg-[#030712]/60 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6">
-          <h3 className="text-center text-sm md:text-base font-black text-blue-50/60 uppercase tracking-[0.25em] mb-12">
+          <h3 className="text-center text-sm md:text-base font-black text-blue-50 uppercase tracking-[0.25em] mb-12">
             每日实时追踪分析 500+ 优质信源
           </h3>
           <div className="flex flex-nowrap overflow-x-auto md:justify-between items-center gap-8 md:gap-4 pb-4 md:pb-0 scrollbar-hide mask-image-gradient">
@@ -540,7 +540,7 @@ export default function Home() {
                 whileHover={{ y: -10 }}
                 className="group relative p-10 rounded-[2.5rem] bg-[#111827]/80 border border-white/10 hover:border-blue-400/30 hover:bg-[#1f2937]/90 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-300 backdrop-blur-xl"
               >
-                <div className="absolute top-8 right-8 text-6xl font-black text-white/10 font-mono group-hover:text-white/20 transition-colors">
+                <div className="absolute top-8 right-8 text-6xl font-black text-white/30 font-mono group-hover:text-white/40 transition-colors">
                   {feature.step}
                 </div>
                 <div className="relative z-10">
@@ -548,7 +548,7 @@ export default function Home() {
                     {feature.icon}
                   </div>
                   <h3 className="text-2xl font-bold mb-4 text-white font-serif">{feature.title}</h3>
-                  <p className="text-blue-50/90 leading-relaxed font-medium">
+                  <p className="text-blue-50 leading-relaxed font-medium">
                     {feature.desc}
                   </p>
                 </div>
@@ -591,9 +591,9 @@ export default function Home() {
             <div className="w-8 h-8 bg-white/10 border border-white/20 text-white rounded-lg flex items-center justify-center font-bold text-sm">
               AI
             </div>
-            <span className="font-bold font-serif text-white/80">Weave</span>
+            <span className="font-bold font-serif text-white">Weave</span>
           </div>
-          <p className="text-sm text-blue-50/60 font-mono">
+          <p className="text-sm text-blue-50/80 font-mono">
             © 2026 Weave. Designed by Axu and Gemini.
           </p>
         </div>

@@ -287,7 +287,7 @@ export default function EnterPage() {
                 <span className="absolute inset-0 text-cyan-400 blur-[2px] translate-x-[2px] opacity-30">Weave</span>
                 <span className="absolute inset-0 text-blue-600 blur-[2px] -translate-x-[2px] opacity-30">Weave</span>
               </h1>
-              <p className="text-blue-200/50 text-xs tracking-[0.5em] uppercase mb-12">
+              <p className="text-blue-200/80 text-xs tracking-[0.5em] uppercase mb-12">
                 信息的迷雾，令人惘然；众人所盼，一面出口
               </p>
               
@@ -296,7 +296,7 @@ export default function EnterPage() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 1 }}
                 onClick={() => router.push("/home")}
-                className="pointer-events-auto px-8 py-3 border border-white/20 rounded-full text-white/80 hover:bg-white/10 hover:text-white transition-all backdrop-blur-sm text-lg tracking-widest font-serif"
+                className="pointer-events-auto px-8 py-3 border border-white/20 rounded-full text-white hover:bg-white/10 hover:text-white transition-all backdrop-blur-sm text-lg tracking-widest font-serif"
                 style={{ fontFamily: 'SimSun, STSong, "Songti SC", serif' }}
               >
                 进入
@@ -329,7 +329,7 @@ export default function EnterPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 2 }}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/20 text-xs tracking-widest uppercase"
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/50 text-xs tracking-widest uppercase"
         >
           Scroll to Fly
         </motion.div>

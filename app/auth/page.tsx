@@ -108,7 +108,7 @@ function AuthContent() {
                 type="text"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                className="w-full px-6 py-5 bg-[#1f2937]/80 border border-white/10 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 outline-none transition-all placeholder:text-white/40 text-base font-bold text-white backdrop-blur-xl"
+                className="w-full px-6 py-5 bg-[#1f2937]/80 border border-white/10 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 outline-none transition-all placeholder:text-white/60 text-base font-bold text-white backdrop-blur-xl"
                 placeholder="Username"
                 required
                 minLength={3}
@@ -122,7 +122,7 @@ function AuthContent() {
                   type={showPassword ? "text" : "password"}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-6 py-5 bg-[#1f2937]/80 border border-white/10 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 outline-none transition-all placeholder:text-white/40 text-base font-bold text-white backdrop-blur-xl"
+                  className="w-full px-6 py-5 bg-[#1f2937]/80 border border-white/10 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 outline-none transition-all placeholder:text-white/60 text-base font-bold text-white backdrop-blur-xl"
                   placeholder="Password"
                   required
                   minLength={6}
@@ -150,7 +150,7 @@ function AuthContent() {
                     type={showConfirmPassword ? "text" : "password"}
                     value={formData.confirmPassword}
                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    className="w-full px-6 py-5 bg-[#1f2937]/80 border border-white/10 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 outline-none transition-all placeholder:text-white/40 text-base font-bold text-white backdrop-blur-xl"
+                    className="w-full px-6 py-5 bg-[#1f2937]/80 border border-white/10 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 outline-none transition-all placeholder:text-white/60 text-base font-bold text-white backdrop-blur-xl"
                     placeholder="Confirm Password"
                     required
                     minLength={6}

@@ -77,7 +77,7 @@ const SummaryCard = memo(({ icon, title, value }: SummaryCardProps) => {
     >
       <div className="flex items-center gap-4 mb-4">
         <div className="p-3 bg-white/5 rounded-xl group-hover:bg-white group-hover:text-[#030712] transition-all duration-500 shadow-lg">{icon}</div>
-        <span className="text-[10px] font-black text-blue-200/20 uppercase tracking-[0.2em]">{title}</span>
+        <span className="text-[10px] font-black text-blue-200/60 uppercase tracking-[0.2em]">{title}</span>
       </div>
       <div className="text-xl font-black text-white truncate font-serif italic drop-shadow-sm">{value}</div>
     </motion.div>
@@ -103,11 +103,11 @@ const ModuleCard = memo(({ id, title, icon, active, result, loading, onActive, o
     <div onClick={onActive} className={`group p-6 rounded-[32px] border-2 transition-all duration-500 bg-white/5 shadow-2xl backdrop-blur-md cursor-pointer ring-1 ring-white/5 ${active ? 'border-blue-500 bg-white/10' : 'border-transparent hover:border-white/10 hover:bg-white/10'}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-5 text-left">
-          <div className={`p-4 rounded-2xl transition-all duration-500 ${active ? 'bg-white text-[#030712]' : 'bg-white/5 text-blue-200/30 border border-white/5'}`}>
+          <div className={`p-4 rounded-2xl transition-all duration-500 ${active ? 'bg-white text-[#030712]' : 'bg-white/5 text-blue-200/70 border border-white/5'}`}>
              {/* 统一缩小 Icon 尺寸 */}
              <div className="w-5 h-5 flex items-center justify-center [&>svg]:w-5 [&>svg]:h-5">{icon}</div>
           </div>
-          <div><h2 className={`text-lg font-black tracking-tight transition-colors ${active ? 'text-white' : 'text-white/60'}`}>{title}</h2></div>
+          <div><h2 className={`text-lg font-black tracking-tight transition-colors ${active ? 'text-white' : 'text-white/90'}`}>{title}</h2></div>
         </div>
         {result?.status === 'success' ? <CheckCircle2 className="text-green-400 w-7 h-7" /> : null}
       </div>
@@ -137,8 +137,8 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 const Input = memo(({ label, ...props }: InputProps) => {
   return (
     <div className="space-y-2 text-left">
-      <label className="text-[10px] font-black text-blue-200/20 uppercase tracking-[0.2em] ml-1">{label}</label>
-      <input className={`w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all font-sans text-white placeholder:text-white/5`} {...props} />
+      <label className="text-[10px] font-black text-blue-200/60 uppercase tracking-[0.2em] ml-1">{label}</label>
+      <input className={`w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all font-sans text-white placeholder:text-white/30`} {...props} />
     </div>
   );
 });
@@ -342,14 +342,14 @@ export default function ConfigWizard() {
       <div className="flex flex-col lg:flex-row w-full justify-between flex-1 overflow-hidden relative z-10">
         <div className="lg:w-[60%] h-full overflow-y-auto p-8 lg:p-12 flex flex-col items-center">
           <div className="w-full max-w-2xl">
-            <div className="mb-10">
-              <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tight font-serif mb-4 italic">
-                自定义<span className="text-blue-400">配置模式</span>
-              </h1>
-              <p className="text-blue-100/80 text-sm font-bold uppercase tracking-widest leading-relaxed">
-                打造完全属于您的专属情报工作流
-              </p>
-            </div>
+              <div className="mb-10">
+                <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tight font-serif mb-4 italic">
+                  自定义<span className="text-blue-400">配置模式</span>
+                </h1>
+                <p className="text-blue-100 text-sm font-bold uppercase tracking-widest leading-relaxed">
+                  打造完全属于您的专属情报工作流
+                </p>
+              </div>
 
             <div className="space-y-4">
               <ModuleCard id="basic" title="01. 基础信息配置" active={activeModule === 'basic'} result={results.basic} loading={loading.basic} onActive={() => setActiveModule(activeModule === 'basic' ? null : 'basic')} onTest={() => testAndSave('basic')} icon={<Settings2 />}>
@@ -357,19 +357,19 @@ export default function ConfigWizard() {
                   <Input label="订阅项目名称" name="projectName" value={formState.projectName} onChange={handleChange} placeholder="例如：我的每日科技简报" />
                   
                   <div>
-                    <label className="text-[10px] font-black text-blue-200/30 uppercase tracking-[0.2em] ml-1 mb-3 block">推送日期</label>
+                    <label className="text-[10px] font-black text-blue-200/60 uppercase tracking-[0.2em] ml-1 mb-3 block">推送日期</label>
                     <div className="flex flex-wrap gap-2.5">
                       {[{ label: "周一", val: 1 }, { label: "周二", val: 2 }, { label: "周三", val: 3 }, { label: "周四", val: 4 }, { label: "周五", val: 5 }, { label: "周六", val: 6 }, { label: "周日", val: 0 }].map((day) => (
-                        <button key={day.val} type="button" onClick={() => { const newDays = formState.pushDays.includes(day.val) ? formState.pushDays.filter(d => d !== day.val) : [...formState.pushDays, day.val]; setFormState(prev => ({ ...prev, pushDays: newDays })); }} className={`px-4 py-2 text-xs font-black uppercase tracking-widest rounded-xl border transition-all ${formState.pushDays.includes(day.val) ? "bg-indigo-500 text-white border-indigo-400" : "bg-white/5 text-blue-200/30 border-white/5 hover:border-white/20"}`}>{day.label}</button>
+                        <button key={day.val} type="button" onClick={() => { const newDays = formState.pushDays.includes(day.val) ? formState.pushDays.filter(d => d !== day.val) : [...formState.pushDays, day.val]; setFormState(prev => ({ ...prev, pushDays: newDays })); }} className={`px-4 py-2 text-xs font-black uppercase tracking-widest rounded-xl border transition-all ${formState.pushDays.includes(day.val) ? "bg-indigo-500 text-white border-indigo-400" : "bg-white/5 text-blue-200/60 border-white/5 hover:border-white/20"}`}>{day.label}</button>
                       ))}
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-blue-200/30 uppercase tracking-[0.2em] ml-1 mb-3 block">每日推送时间 (24小时制)</label>
+                    <label className="text-[10px] font-black text-blue-200/60 uppercase tracking-[0.2em] ml-1 mb-3 block">每日推送时间 (24小时制)</label>
                     <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
                       {Array.from({ length: 24 }).map((_, i) => (
-                        <button key={i} type="button" onClick={() => setFormState(prev => ({ ...prev, pushTime: i.toString() }))} className={`py-2 text-xs font-black rounded-xl border transition-all ${formState.pushTime === i.toString() ? "bg-white text-[#1e1b4b] border-white shadow-xl scale-105" : "bg-white/5 text-blue-200/30 border-white/5 hover:border-white/20"}`}>{i}:00</button>
+                        <button key={i} type="button" onClick={() => setFormState(prev => ({ ...prev, pushTime: i.toString() }))} className={`py-2 text-xs font-black rounded-xl border transition-all ${formState.pushTime === i.toString() ? "bg-white text-[#1e1b4b] border-white shadow-xl scale-105" : "bg-white/5 text-blue-200/60 border-white/5 hover:border-white/20"}`}>{i}:00</button>
                       ))}
                     </div>
                   </div>
@@ -378,17 +378,17 @@ export default function ConfigWizard() {
 
               <ModuleCard id="rss" title="02. 订阅源配置" active={activeModule === 'rss'} result={results.rss} loading={loading.rss} onActive={() => setActiveModule(activeModule === 'rss' ? null : 'rss')} onTest={() => testAndSave('rss')} icon={<RssIcon />}>
                 <div className="pt-2 text-left space-y-3">
-                  <label className="text-[10px] font-black text-blue-200/30 uppercase tracking-[0.2em] ml-1 block">手动添加订阅源 (每行一个 URL)</label>
-                  <textarea name="rssUrls" rows={8} value={formState.rssUrls} onChange={handleChange} className="w-full bg-black/20 border border-white/10 rounded-2xl p-5 text-sm font-sans focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none text-white placeholder:text-white/5" placeholder="https://example.com/feed" />
+                  <label className="text-[10px] font-black text-blue-200/60 uppercase tracking-[0.2em] ml-1 block">手动添加订阅源 (每行一个 URL)</label>
+                  <textarea name="rssUrls" rows={8} value={formState.rssUrls} onChange={handleChange} className="w-full bg-black/20 border border-white/10 rounded-2xl p-5 text-sm font-sans focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none text-white placeholder:text-white/30" placeholder="https://example.com/feed" />
                 </div>
               </ModuleCard>
 
               <ModuleCard id="prompts" title="03. AI 提示词自定义" active={activeModule === 'prompts'} result={results.prompts} loading={loading.prompts} onActive={() => setActiveModule(activeModule === 'prompts' ? null : 'prompts')} onTest={() => testAndSave('prompts')} icon={<Sparkles />}>
                 <div className="pt-2 text-left space-y-6">
                   <div className="flex bg-black/20 p-1.5 rounded-2xl border border-white/10">
-                    <button type="button" onClick={() => setPromptTab('analyst')} className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${promptTab === 'analyst' ? 'bg-white text-[#1e1b4b] shadow-lg' : 'text-blue-200/30 hover:text-white'}`}>分析阶段</button>
-                    <button type="button" onClick={() => setPromptTab('editor')} className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${promptTab === 'editor' ? 'bg-white text-[#1e1b4b] shadow-lg' : 'text-blue-200/30 hover:text-white'}`}>汇总阶段</button>
-                    <button type="button" onClick={() => setPromptTab('tldr')} className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${promptTab === 'tldr' ? 'bg-white text-[#1e1b4b] shadow-lg' : 'text-blue-200/30 hover:text-white'}`}>今日焦点</button>
+                    <button type="button" onClick={() => setPromptTab('analyst')} className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${promptTab === 'analyst' ? 'bg-white text-[#1e1b4b] shadow-lg' : 'text-blue-200/60 hover:text-white'}`}>分析阶段</button>
+                    <button type="button" onClick={() => setPromptTab('editor')} className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${promptTab === 'editor' ? 'bg-white text-[#1e1b4b] shadow-lg' : 'text-blue-200/60 hover:text-white'}`}>汇总阶段</button>
+                    <button type="button" onClick={() => setPromptTab('tldr')} className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${promptTab === 'tldr' ? 'bg-white text-[#1e1b4b] shadow-lg' : 'text-blue-200/60 hover:text-white'}`}>今日焦点</button>
                   </div>
                   <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
                     <textarea 
@@ -444,18 +444,18 @@ export default function ConfigWizard() {
               <>
                 <header className="mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
                   <h3 className="text-3xl font-black mb-4 tracking-tighter font-serif italic text-white">{HELP_CONTENT[activeModule]?.title}</h3>
-                  <p className="text-base text-blue-100/80 leading-relaxed font-bold uppercase tracking-widest">{HELP_CONTENT[activeModule]?.desc}</p>
+                  <p className="text-base text-blue-50 leading-relaxed font-bold uppercase tracking-widest">{HELP_CONTENT[activeModule]?.desc}</p>
                 </header>
                 <div className="space-y-10 text-left animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-100">
                   {HELP_CONTENT[activeModule]?.steps.map((step: any, idx: number) => (
                     <div key={idx} className="flex gap-8 group">
                       <div className="flex flex-col items-center">
-                        <div className={`w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-sm font-black text-blue-200/30 group-hover:bg-white group-hover:text-[#030712] group-hover:scale-110 transition-all duration-500`}>{idx + 1}</div>
+                        <div className={`w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-sm font-black text-blue-200/60 group-hover:bg-white group-hover:text-[#030712] group-hover:scale-110 transition-all duration-500`}>{idx + 1}</div>
                         {idx !== HELP_CONTENT[activeModule].steps.length - 1 ? <div className="w-px h-12 bg-white/5 mt-3" /> : null}
                       </div>
                       <div>
                         <h4 className="text-lg font-black text-white mb-2 font-serif">{step.t}</h4>
-                        <p className="text-sm text-blue-100/70 font-medium leading-relaxed">{step.d}</p>
+                        <p className="text-sm text-blue-50 font-medium leading-relaxed">{step.d}</p>
                       </div>
                     </div>
                   ))}

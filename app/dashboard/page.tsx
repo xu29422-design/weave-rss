@@ -568,9 +568,9 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-6">
           <nav className="hidden md:flex items-center bg-white/10 p-1 rounded-2xl border border-white/10 backdrop-blur-sm">
-            <button onClick={() => setActiveTab('shelf')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'shelf' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>主题货架</button>
-            <button onClick={() => setActiveTab('active')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'active' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>已订阅</button>
-            <button onClick={() => setActiveTab('settings')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'settings' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/60 hover:text-white'}`}>个人中心</button>
+          <button onClick={() => setActiveTab('shelf')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'shelf' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/80 hover:text-white'}`}>主题货架</button>
+          <button onClick={() => setActiveTab('active')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'active' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/80 hover:text-white'}`}>已订阅</button>
+          <button onClick={() => setActiveTab('settings')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'settings' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/80 hover:text-white'}`}>个人中心</button>
           </nav>
           <div className="h-8 w-px bg-white/10 mx-2" />
           <div className="flex items-center gap-3">
@@ -578,7 +578,7 @@ export default function Dashboard() {
               <User className="w-4 h-4 text-blue-200" />
               <span className="text-sm font-bold text-white">{username}</span>
             </div>
-            <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); router.push("/"); }} className="p-2.5 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all">
+            <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); router.push("/"); }} className="p-2.5 text-white/70 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all">
               <LogOut className="w-5 h-5" />
             </button>
           </div>
@@ -619,27 +619,27 @@ export default function Dashboard() {
                     {/* Webhook 配置 (仅当未配置时显示) */}
                     {!settings.webhookUrl && (
                       <div className="space-y-3">
-                        <label className="text-xs font-black text-blue-900/30 uppercase tracking-widest ml-1 block">Webhook 地址 (必填)</label>
+                        <label className="text-xs font-black text-blue-900/40 uppercase tracking-widest ml-1 block">Webhook 地址 (必填)</label>
                         <input 
                           type="text" 
                           value={modalConfig.webhookUrl}
                           onChange={(e) => setModalConfig(prev => ({ ...prev, webhookUrl: e.target.value }))}
                           placeholder="请输入机器人 Webhook 地址"
-                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-blue-900/20"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-blue-900/40"
                         />
-                        <p className="text-[10px] text-blue-900/20 ml-1 font-medium">首次订阅需配置接收地址，后续可直接复用。</p>
+                        <p className="text-[10px] text-blue-900/40 ml-1 font-medium">首次订阅需配置接收地址，后续可直接复用。</p>
                       </div>
                     )}
 
                     {/* 推送时间 */}
                     <div className="space-y-3">
-                      <label className="text-xs font-black text-blue-900/20 uppercase tracking-widest ml-1 block">每日推送时间</label>
+                      <label className="text-xs font-black text-blue-900/40 uppercase tracking-widest ml-1 block">每日推送时间</label>
                       <div className="grid grid-cols-6 gap-2">
                         {Array.from({ length: 24 }).map((_, i) => (
                           <button 
                             key={i} 
                             onClick={() => setModalConfig(prev => ({ ...prev, pushTime: i.toString() }))} 
-                            className={`py-2.5 text-xs font-bold rounded-xl border transition-all ${modalConfig.pushTime === i.toString() ? "bg-blue-950 text-white shadow-lg scale-105" : "bg-white/5 text-blue-900/30 border-white/10 hover:border-white/20 hover:bg-white/10"}`}
+                            className={`py-2.5 text-xs font-bold rounded-xl border transition-all ${modalConfig.pushTime === i.toString() ? "bg-blue-950 text-white shadow-lg scale-105" : "bg-white/5 text-blue-900/40 border-white/10 hover:border-white/20 hover:bg-white/10"}`}
                           >
                             {i}:00
                           </button>
@@ -649,7 +649,7 @@ export default function Dashboard() {
 
                     {/* 推送周期 */}
                     <div className="space-y-3">
-                      <label className="text-xs font-black text-blue-900/20 uppercase tracking-widest ml-1 block">推送周期</label>
+                      <label className="text-xs font-black text-blue-900/40 uppercase tracking-widest ml-1 block">推送周期</label>
                       <div className="flex flex-wrap gap-2">
                         {[{ label: "周一", val: 1 }, { label: "周二", val: 2 }, { label: "周三", val: 3 }, { label: "周四", val: 4 }, { label: "周五", val: 5 }, { label: "周六", val: 6 }, { label: "周日", val: 0 }].map((day) => (
                           <button 
@@ -658,7 +658,7 @@ export default function Dashboard() {
                               const newDays = modalConfig.pushDays.includes(day.val) ? modalConfig.pushDays.filter(d => d !== day.val) : [...modalConfig.pushDays, day.val]; 
                               setModalConfig(prev => ({ ...prev, pushDays: newDays })); 
                             }} 
-                            className={`px-4 py-2.5 text-xs font-bold rounded-xl border transition-all ${modalConfig.pushDays.includes(day.val) ? "bg-blue-600/10 text-blue-600 border-blue-500/20 shadow-lg shadow-blue-900/5" : "bg-white/5 text-blue-900/20 border-white/10 hover:border-white/20"}`}
+                            className={`px-4 py-2.5 text-xs font-bold rounded-xl border transition-all ${modalConfig.pushDays.includes(day.val) ? "bg-blue-600/10 text-blue-600 border-blue-500/20 shadow-lg shadow-blue-900/5" : "bg-white/5 text-blue-900/40 border-white/10 hover:border-white/20"}`}
                           >
                             {day.label}
                           </button>
@@ -704,13 +704,13 @@ export default function Dashboard() {
                   </div>
                   
                   <div className="space-y-3">
-                    <label className="text-xs font-black text-blue-900/30 uppercase tracking-widest ml-1 block">RSS 链接</label>
+                    <label className="text-xs font-black text-blue-900/40 uppercase tracking-widest ml-1 block">RSS 链接</label>
                     <input 
                       type="text" 
                       value={newSourceUrl}
                       onChange={(e) => setNewSourceUrl(e.target.value)}
                       placeholder="https://example.com/feed.xml"
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-blue-900/20"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-blue-900/40"
                     />
                   </div>
 
@@ -747,7 +747,7 @@ export default function Dashboard() {
                     placeholder="搜索感兴趣的主题（如：AI、设计、财经...）" 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-white/10 border border-white/10 rounded-[24px] pl-16 pr-8 py-6 text-lg outline-none focus:ring-2 focus:ring-blue-400 transition-all font-medium text-white placeholder:text-white/20"
+                    className="w-full bg-white/10 border border-white/10 rounded-[24px] pl-16 pr-8 py-6 text-lg outline-none focus:ring-2 focus:ring-blue-400 transition-all font-medium text-white placeholder:text-white/50"
                   />
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -758,7 +758,7 @@ export default function Dashboard() {
                       className={`px-6 py-3 rounded-full text-sm font-bold transition-all ${
                         selectedCategory === cat.id 
                           ? "bg-white text-blue-950 shadow-[0_0_20px_rgba(255,255,255,0.2)] scale-105" 
-                          : "bg-white/5 text-white/50 border border-white/5 hover:bg-white/10 hover:border-white/10 hover:text-white"
+                          : "bg-white/5 text-white/80 border border-white/5 hover:bg-white/10 hover:border-white/10 hover:text-white"
                       }`}
                     >
                       {cat.label}
@@ -944,19 +944,19 @@ export default function Dashboard() {
                             </div>
                             <div>
                               <h3 className="text-xl font-black text-white font-serif">自定义源</h3>
-                              <p className="text-xs text-blue-100/60 font-bold uppercase tracking-widest mt-1">{customRssSources.length} 个信源</p>
+                              <p className="text-xs text-blue-100/80 font-bold uppercase tracking-widest mt-1">{customRssSources.length} 个信源</p>
                             </div>
                           </div>
                           
                           <div className="space-y-3">
                             {customRssSources.slice(0, 5).map((url: string, idx: number) => (
-                              <div key={idx} className="flex items-center gap-3 px-4 py-3 bg-white/5 rounded-2xl border border-white/5 text-[11px] text-blue-100/70 font-medium">
+                              <div key={idx} className="flex items-center gap-3 px-4 py-3 bg-white/5 rounded-2xl border border-white/5 text-[11px] text-blue-100/80 font-medium">
                                 <div className="w-1.5 h-1.5 rounded-full bg-blue-400/50" />
                                 <span className="truncate">{url}</span>
                               </div>
                             ))}
                             {customRssSources.length > 5 && (
-                              <p className="text-[10px] text-blue-100/50 font-black uppercase tracking-widest text-center pt-2">还有 {customRssSources.length - 5} 个更多源...</p>
+                              <p className="text-[10px] text-blue-100/80 font-black uppercase tracking-widest text-center pt-2">还有 {customRssSources.length - 5} 个更多源...</p>
                             )}
                           </div>
                         </div>
@@ -1045,7 +1045,7 @@ export default function Dashboard() {
                           value={settings.geminiApiKey || ""} 
                           onChange={(e) => setSettings({...settings, geminiApiKey: e.target.value})}
                           placeholder="留空则使用免费额度"
-                          className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-base outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/30"
+                          className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-base outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/50"
                         />
                       </div>
                     ) : (
@@ -1067,7 +1067,7 @@ export default function Dashboard() {
                               value={settings.openaiBaseUrl || ""} 
                               onChange={(e) => setSettings({...settings, openaiBaseUrl: e.target.value})}
                               placeholder="https://api.openai.com/v1"
-                              className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/30"
+                              className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/50"
                             />
                           </div>
                           <div>
@@ -1077,7 +1077,7 @@ export default function Dashboard() {
                               value={settings.openaiModel || ""} 
                               onChange={(e) => setSettings({...settings, openaiModel: e.target.value})}
                               placeholder="gpt-4o"
-                              className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/30"
+                              className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/50"
                             />
                           </div>
                         </div>
