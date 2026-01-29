@@ -84,14 +84,14 @@ function AuthContent() {
           Back Home
         </button>
 
-        <div className="text-center space-y-6 mb-12">
-          <div className="mx-auto px-6 h-16 bg-white/10 border border-white/20 text-white rounded-2xl flex items-center justify-center font-black text-2xl italic font-serif shadow-2xl shadow-blue-500/20 backdrop-blur-md">
+        <div className="text-center space-y-4 mb-10">
+          <div className="mx-auto w-fit px-8 py-2.5 bg-white/10 border border-white/20 text-white rounded-2xl flex items-center justify-center font-black text-xl italic font-serif shadow-2xl shadow-blue-500/20 backdrop-blur-md">
             Weave
           </div>
-          <h1 className="text-5xl font-black text-white tracking-tighter uppercase leading-[0.9] font-serif italic drop-shadow-lg">
+          <h1 className="text-3xl font-black text-white tracking-tight uppercase leading-none font-serif italic drop-shadow-lg">
             {mode === "login" ? "登录" : "注册"}
           </h1>
-          <p className="text-sm text-white/60 font-bold uppercase tracking-[0.2em]">
+          <p className="text-xs text-white/60 font-bold uppercase tracking-[0.2em]">
             {mode === "login" ? "Welcome back" : "Create account"}
           </p>
         </div>
