@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+export const dynamic = 'force-dynamic';
+
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
   Sparkles, Cpu, Newspaper, Book, Gamepad2, LineChart, 
@@ -363,7 +365,7 @@ const ThemePreview = ({ theme }: { theme: Theme }) => {
   }
 };
 
-export default function Dashboard() {
+function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -436,18 +438,18 @@ export default function Dashboard() {
   const handleThanks = async () => {
     setThanksLoading(true);
     try {
-      // ?? Server Action ???????????
+      // 通过 Server Action 转发请求，解决跨域问题
       const result = await pushToAdminBot('feedback', { 
-        text: `?? ??????? [${username}] ?????????????????? API ???` 
+        text: `🌟 感谢阿旭！用户 [${username}] 刚刚为你点了一个赞，感谢你提供的免费 API 羊毛！` 
       });
       
       if (result.success) {
-        alert("???????? Webhook ?????~");
+        alert("点赞成功！已通过 Webhook 告诉阿旭啦~");
       } else {
         throw new Error("Submission failed");
       }
     } catch (e) {
-      alert("?????????????????");
+      alert("点赞失败，但阿旭感受到了你的心意！");
     } finally {
       setThanksLoading(false);
     }
@@ -1093,5 +1095,13 @@ export default function Dashboard() {
         </AnimatePresence>
       </main>
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-transparent"><Loader2 className="w-12 h-12 animate-spin text-white" /></div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
