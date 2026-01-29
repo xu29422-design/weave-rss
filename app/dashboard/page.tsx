@@ -436,18 +436,18 @@ export default function Dashboard() {
   const handleThanks = async () => {
     setThanksLoading(true);
     try {
-      // 推送点赞到阿旭的 Webhook
-      await fetch("https://365.kdocs.cn/woa/api/v1/webhook/send?key=113a89749298fba10dcae6b7cb60db09", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          msg_type: "text",
-          content: { text: `🌟 感谢阿旭！用户 [${username}] 刚刚为你点了一个赞，感谢你提供的免费 API 羊毛！` }
-        })
+      // ?? Server Action ???????????
+      const result = await pushToAdminBot('feedback', { 
+        text: `?? ??????? [${username}] ?????????????????? API ???` 
       });
-      alert("点赞成功！已通过 Webhook 告诉阿旭啦~");
+      
+      if (result.success) {
+        alert("???????? Webhook ?????~");
+      } else {
+        throw new Error("Submission failed");
+      }
     } catch (e) {
-      alert("点赞失败，但阿旭感受到了你的心意！");
+      alert("?????????????????");
     } finally {
       setThanksLoading(false);
     }
