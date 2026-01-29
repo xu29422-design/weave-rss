@@ -15,6 +15,7 @@ export default function AdminPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any[]>([]);
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [error, setError] = useState("");
   const [isAuthorized, setIsAuthorized] = useState(false);
   
@@ -78,6 +79,7 @@ export default function AdminPage() {
     const result = await getAllUserStats();
     if (result.success) {
       setStats(result.data || []);
+      setFeedbacks(result.feedbacks || []);
     } else {
       setError(result.error || "获取数据失败");
     }
@@ -237,117 +239,147 @@ export default function AdminPage() {
         </div>
 
         {/* 用户详细列表 */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900">
-              <Database className="w-5 h-5 text-blue-600" /> 用户订阅明细
-            </h2>
-            <div className="text-xs text-slate-400 font-mono">
-              Last sync: {new Date().toLocaleTimeString()}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900">
+                <Database className="w-5 h-5 text-blue-600" /> 用户订阅明细
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              {stats.map((user, i) => (
+                <motion.div
+                  key={user.userId}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="group bg-white border border-slate-200 rounded-3xl p-6 hover:border-blue-200 hover:shadow-lg hover:shadow-blue-500/5 transition-all"
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 text-xl font-bold text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
+                        {user.userId.substring(0, 1).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                          {user.userId}
+                          {user.userId === "1159370261@qq.com" && (
+                            <span className="text-[9px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200 uppercase tracking-tighter font-bold">Admin</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-400 font-mono truncate max-w-[200px]">{user.settings?.webhookUrl || "未配置 Webhook"}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-8">
+                      <div className="space-y-1">
+                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">已订阅主题</div>
+                        <div className="flex gap-1.5">
+                          {user.settings?.subscribedThemes?.length > 0 ? (
+                            user.settings.subscribedThemes.map((theme: string) => (
+                              <span key={theme} className="text-[10px] bg-blue-50 border border-blue-100 px-2 py-1 rounded-lg text-blue-600 font-medium">
+                                {theme}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[10px] text-slate-300 italic">无订阅</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">推送配置</div>
+                        <div className="text-xs text-slate-600 flex items-center gap-2 font-medium">
+                          <Globe className="w-3 h-3 text-blue-500" />
+                          {user.settings?.aiProvider || "未设置"} · {user.settings?.pushTime || "8"}:00
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">RSS 源</div>
+                        <div className="text-xs text-slate-600 font-mono font-medium">
+                          {user.rssSources?.length || 0} 个来源
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 推送日志部分 */}
+                  {user.pushLogs && user.pushLogs.length > 0 && (
+                    <div className="mt-6 pt-6 border-t border-slate-100">
+                      <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-3">最近推送日志</div>
+                      <div className="space-y-2">
+                        {user.pushLogs.map((log: any) => (
+                          <div key={log.id} className="flex items-center justify-between text-[11px] bg-slate-50/50 p-2 rounded-xl border border-slate-100/50">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-1.5 h-1.5 rounded-full ${log.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                              <span className="text-slate-400 font-mono">
+                                {new Date(log.timestamp).toLocaleString('zh-CN', { 
+                                  month: 'numeric', 
+                                  day: 'numeric', 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                })}
+                              </span>
+                              <span className={`font-bold ${log.status === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                {log.status === 'success' ? '推送成功' : '推送失败'}
+                              </span>
+                              {log.error && (
+                                <span className="text-red-400 truncate max-w-[150px]" title={log.error}>
+                                  : {log.error}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-slate-400">
+                              {log.details?.sourceCount || 0} 源 / {log.details?.themeCount || 0} 主题
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            {stats.map((user, i) => (
-              <motion.div
-                key={user.userId}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="group bg-white border border-slate-200 rounded-3xl p-6 hover:border-blue-200 hover:shadow-lg hover:shadow-blue-500/5 transition-all"
-              >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 text-xl font-bold text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
-                      {user.userId.substring(0, 1).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        {user.userId}
-                        {user.userId === "1159370261@qq.com" && (
-                          <span className="text-[9px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200 uppercase tracking-tighter font-bold">Admin</span>
-                        )}
-                      </div>
-                      <div className="text-xs text-slate-400 font-mono truncate max-w-[300px]">{user.settings?.webhookUrl || "未配置 Webhook"}</div>
-                    </div>
+          {/* 右侧反馈列表 */}
+          <div className="space-y-6">
+            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900">
+              <Heart className="w-5 h-5 text-pink-500" /> 用户反馈与点赞
+            </h2>
+            <div className="space-y-4">
+              {feedbacks.map((fb, i) => (
+                <motion.div
+                  key={fb.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-slate-900">{fb.username}</span>
+                    <span className="text-[10px] text-slate-400">{new Date(fb.timestamp).toLocaleString()}</span>
                   </div>
-
-                  <div className="flex flex-wrap gap-8">
-                    <div className="space-y-1">
-                      <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">已订阅主题</div>
-                      <div className="flex gap-1.5">
-                        {user.settings?.subscribedThemes?.length > 0 ? (
-                          user.settings.subscribedThemes.map((theme: string) => (
-                            <span key={theme} className="text-[10px] bg-blue-50 border border-blue-100 px-2 py-1 rounded-lg text-blue-600 font-medium">
-                              {theme}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-[10px] text-slate-300 italic">无订阅</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">推送配置</div>
-                      <div className="text-xs text-slate-600 flex items-center gap-2 font-medium">
-                        <Globe className="w-3 h-3 text-blue-500" />
-                        {user.settings?.aiProvider || "未设置"} · {user.settings?.pushTime || "8"}:00
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">RSS 源</div>
-                      <div className="text-xs text-slate-600 font-mono font-medium">
-                        {user.rssSources?.length || 0} 个来源
-                      </div>
-                    </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                      fb.type === 'feedback' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'
+                    }`}>
+                      {fb.type === 'feedback' ? '点赞/反馈' : '配置更新'}
+                    </span>
                   </div>
+                  <div className="text-xs text-slate-600 bg-slate-50 p-2 rounded-lg font-mono break-all">
+                    {typeof fb.content === 'object' ? JSON.stringify(fb.content) : fb.content}
+                  </div>
+                </motion.div>
+              ))}
+              {feedbacks.length === 0 && (
+                <div className="text-center py-10 border border-dashed border-slate-200 rounded-2xl text-slate-400 text-xs">
+                  暂无反馈记录
                 </div>
-
-                {/* 推送日志部分 */}
-                {user.pushLogs && user.pushLogs.length > 0 && (
-                  <div className="mt-6 pt-6 border-t border-slate-100">
-                    <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-3">最近推送日志</div>
-                    <div className="space-y-2">
-                      {user.pushLogs.map((log: any) => (
-                        <div key={log.id} className="flex items-center justify-between text-[11px] bg-slate-50/50 p-2 rounded-xl border border-slate-100/50">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-1.5 h-1.5 rounded-full ${log.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                            <span className="text-slate-400 font-mono">
-                              {new Date(log.timestamp).toLocaleString('zh-CN', { 
-                                month: 'numeric', 
-                                day: 'numeric', 
-                                hour: '2-digit', 
-                                minute: '2-digit' 
-                              })}
-                            </span>
-                            <span className={`font-bold ${log.status === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-                              {log.status === 'success' ? '推送成功' : '推送失败'}
-                            </span>
-                            {log.error && (
-                              <span className="text-red-400 truncate max-w-[200px]" title={log.error}>
-                                : {log.error}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-slate-400">
-                            {log.details?.sourceCount || 0} 源 / {log.details?.themeCount || 0} 主题
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </motion.div>
-            ))}
-
-            {stats.length === 0 && (
-              <div className="text-center py-20 bg-slate-50 border border-dashed border-slate-200 rounded-3xl">
-                <Search className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-                <p className="text-slate-400">暂无用户数据</p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </main>

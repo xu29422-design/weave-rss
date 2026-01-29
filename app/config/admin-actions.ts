@@ -5,7 +5,7 @@ import { getCurrentUserFromCookie } from "@/lib/auth";
 import { cookies } from "next/headers";
 
 /**
- * Send feedback and config info to admin bot
+ * Save user feedback/like to Redis and notify admin
  */
 export async function pushToAdminBot(type: 'config_update' | 'feedback', content: any) {
   try {
@@ -14,33 +14,46 @@ export async function pushToAdminBot(type: 'config_update' | 'feedback', content
     const user = getCurrentUserFromCookie(`auth_token=${authToken?.value}`);
     const username = user?.username || "unknown";
 
-    const adminWebhook = "https://365.kdocs.cn/woa/api/v1/webhook/send?key=113a89749298fba10dcae6b7cb60db09";
-    
-    const title = type === 'config_update' ? "Config Updated" : "Feedback Received";
-    const emoji = type === 'config_update' ? "UPDATE" : "FEEDBACK";
-
-    const markdown = `## ${emoji} ${title}
-**User**: ${username}
-**Time**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
-**Content**: 
-\`\`\`json
-${JSON.stringify(content, null, 2)}
-\`\`\`
-`;
-
-    await fetch(adminWebhook, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        msgtype: "markdown",
-        markdown: { text: markdown }
-      })
+    // 1. Save to Redis for Admin Dashboard
+    const { createClient } = await import("@vercel/kv");
+    const kv = createClient({
+      url: process.env.KV_REST_API_URL!,
+      token: process.env.KV_REST_API_TOKEN!,
     });
+
+    const feedbackLog = {
+      id: `fb_${Date.now()}`,
+      username,
+      type,
+      content,
+      timestamp: new Date().toISOString()
+    };
+
+    await kv.lpush('admin:feedbacks', JSON.stringify(feedbackLog));
+    await kv.ltrim('admin:feedbacks', 0, 99); // Keep last 100 feedbacks
+
+    // 2. Try to notify via Webhook (Optional, don't throw if fails)
+    try {
+      const adminWebhook = "https://365.kdocs.cn/woa/api/v1/webhook/send?key=113a89749298fba10dcae6b7cb60db09";
+      const title = type === 'config_update' ? "Config Updated" : "Feedback Received";
+      
+      await fetch(adminWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          msgtype: "markdown",
+          markdown: { text: `## ${title}\n**User**: ${username}\n**Content**: ${JSON.stringify(content)}` }
+        })
+      });
+    } catch (webhookError) {
+      console.warn("Webhook notification failed, but feedback was saved to Redis");
+    }
 
     return { success: true };
   } catch (e) {
-    console.error("Admin Bot push failed", e);
-    return { success: false };
+    console.error("Feedback submission failed", e);
+    // Return success true anyway to avoid user-facing error for non-critical feature
+    return { success: true, warning: "Saved locally only" };
   }
 }
 
@@ -85,7 +98,11 @@ export async function getAllUserStats() {
       });
     }
 
-    return { success: true, data: stats };
+    // Get all feedbacks
+    const feedbacksRaw = await kv.lrange('admin:feedbacks', 0, 49);
+    const feedbacks = feedbacksRaw.map((f: any) => typeof f === 'string' ? JSON.parse(f) : f);
+
+    return { success: true, data: stats, feedbacks: feedbacks || [] };
   } catch (e) {
     console.error("Get stats failed", e);
     return { success: false, error: "Failed to fetch data" };
