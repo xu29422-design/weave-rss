@@ -59,7 +59,14 @@ function AuthContent() {
         return;
       }
 
-      router.push(safeRedirect || data.redirectTo || "/dashboard");
+      if (safeRedirect || data.redirectTo) {
+        router.push(safeRedirect || data.redirectTo);
+      } else {
+        // 如果是注册模式，跳转到货架 (默认)
+        // 如果是登录模式，跳转到已订阅 (active)
+        const targetPath = mode === "register" ? "/dashboard" : "/dashboard?tab=active";
+        router.push(targetPath);
+      }
       router.refresh();
     } catch (err: any) {
       setError("网络错误，请重试");
