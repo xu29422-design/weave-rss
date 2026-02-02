@@ -8,12 +8,12 @@ import { pushToAdminBot } from "./admin-actions";
 import { 
   CheckCircle2, AlertCircle, Loader2, ExternalLink, BookOpen, ArrowRight, Sparkles,
   Link2, Settings2, LogOut, User, Play, Edit3, ChevronRight, Clock, Calendar, Zap, LayoutDashboard,
-  MessageSquare, Send, Plus, Check, Info
+  MessageSquare, Send, Plus, Check, Info, Heart
 } from "lucide-react";
 import { RssIcon } from "@/components/AnimatedIcons";
 import { motion } from "framer-motion";
 
-type ConfigModule = 'basic' | 'rss' | 'prompts';
+type ConfigModule = 'basic' | 'rss' | 'prompts' | 'kdocs';
 
 interface HelpStep {
   t: string;
@@ -56,6 +56,16 @@ const HELP_CONTENT: Record<ConfigModule, HelpContent> = {
       { t: "分析阶段", d: "控制 AI 如何对单条新闻进行分类、打分和提炼。" },
       { t: "汇总阶段", d: "控制 AI 如何将多条新闻组合成易读的日报段落。" },
       { t: "今日焦点", d: "控制 AI 如何撰写每日最核心的 100 字精华摘要。" }
+    ]
+  },
+  kdocs: {
+    title: "轻维表推送配置",
+    desc: "将简报数据同步到金山文档轻维表，方便后续查阅和分析。",
+    color: "from-green-600 to-emerald-600",
+    steps: [
+      { t: "获取凭证", d: "在金山文档开放平台注册应用，获取 App ID 和 App Secret。" },
+      { t: "创建轻维表", d: "在金山文档中创建轻维表，获取 File Token 和 DBSheet ID。" },
+      { t: "配置字段", d: "确保轻维表包含必要的字段：日期、今日焦点、分类数量等。" }
     ]
   }
 };
@@ -160,6 +170,34 @@ export default function ConfigWizard() {
 
   const [feedback, setFeedback] = useState("");
   const [sendingFeedback, setSendingFeedback] = useState(false);
+  const [thanksLoading, setThanksLoading] = useState(false);
+
+  const handleUseFreeApi = () => {
+    // 预设免费 API 配置
+    const PRESET_FREE_API = {
+      aiProvider: "openai" as const,
+      openaiApiKey: "fcd9114b61ff49259c8770eba426f6e5.eiMdQXWwcOi6SAu7",
+      openaiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
+      openaiModel: "glm-4.5-flash"
+    };
+
+    setFormState(prev => ({
+      ...prev,
+      ...PRESET_FREE_API
+    }));
+    setAiProvider("openai");
+    
+    // 自动切换到 AI 模块并展开
+    setActiveModule("prompts");
+    setPromptTab("analyst");
+    
+    // 异步通知管理员
+    pushToAdminBot('feedback', { 
+      type: 'use_free_api',
+      username,
+      message: "用户在配置页使用了免费 API" 
+    });
+  };
 
   const [formState, setFormState] = useState({
     projectName: "我的每日简报",
@@ -172,6 +210,12 @@ export default function ConfigWizard() {
     pushTime: "8",
     pushDays: [1, 2, 3, 4, 5] as number[],
     rssUrls: "",
+    // 轻维表配置
+    kdocsAppId: "",
+    kdocsAppSecret: "",
+    kdocsFileToken: "",
+    kdocsDBSheetId: "",
+    enableKdocsPush: false,
     analystPrompt: `你是一位专业的科技情报分析师。请对提供的单条新闻条目进行分析并分类。
 要求：
 1. 提炼核心内容，控制在 100 字以内。
@@ -235,7 +279,13 @@ export default function ConfigWizard() {
             rssUrls: configData.rssSources?.join("\n") || "",
             analystPrompt: configData.settings?.analystPrompt || "",
             editorPrompt: configData.settings?.editorPrompt || "",
-            tldrPrompt: configData.settings?.tldrPrompt || ""
+            tldrPrompt: configData.settings?.tldrPrompt || "",
+            // 轻维表配置
+            kdocsAppId: configData.settings?.kdocsAppId || "",
+            kdocsAppSecret: configData.settings?.kdocsAppSecret || "",
+            kdocsFileToken: configData.settings?.kdocsFileToken || "",
+            kdocsDBSheetId: configData.settings?.kdocsDBSheetId || "",
+            enableKdocsPush: configData.settings?.enableKdocsPush || false,
           };
           setFormState(newState);
           if (configData.settings?.aiProvider) setAiProvider(configData.settings.aiProvider);
@@ -247,6 +297,7 @@ export default function ConfigWizard() {
           if (configData.rssSources?.length > 0) initialResults.rss = { status: 'success', message: '已保存' };
           initialResults.prompts = { status: 'success', message: '已保存' };
           initialResults.basic = { status: 'success', message: '已保存' };
+          if (configData.settings?.enableKdocsPush && configData.settings?.kdocsFileToken) initialResults.kdocs = { status: 'success', message: '已保存' };
           setResults(initialResults);
         }
       } catch (error) {
@@ -259,8 +310,13 @@ export default function ConfigWizard() {
   const [aiProvider, setAiProvider] = useState<"google" | "openai">("google");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormState(prev => ({ ...prev, [name]: value }));
+    const { name, value, type } = e.target;
+    if (type === 'checkbox') {
+      const checked = (e.target as HTMLInputElement).checked;
+      setFormState(prev => ({ ...prev, [name]: checked }));
+    } else {
+      setFormState(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   async function testAndSave(module: ConfigModule) {
@@ -299,6 +355,7 @@ export default function ConfigWizard() {
 
         if (module === 'basic') setActiveModule('rss');
         else if (module === 'rss') setActiveModule('prompts');
+        else if (module === 'prompts') setActiveModule('kdocs');
       }
     } catch (e) {
       setResults(prev => ({ ...prev, [module]: { status: 'error', message: '校验或保存失败' } }));
@@ -383,8 +440,19 @@ export default function ConfigWizard() {
                 </div>
               </ModuleCard>
 
-              <ModuleCard id="prompts" title="03. AI 提示词自定义" active={activeModule === 'prompts'} result={results.prompts} loading={loading.prompts} onActive={() => setActiveModule(activeModule === 'prompts' ? null : 'prompts')} onTest={() => testAndSave('prompts')} icon={<Sparkles />}>
+              <ModuleCard id="prompts" title="03. 配置你的AI-APIkey" active={activeModule === 'prompts'} result={results.prompts} loading={loading.prompts} onActive={() => setActiveModule(activeModule === 'prompts' ? null : 'prompts')} onTest={() => testAndSave('prompts')} icon={<Sparkles />}>
                 <div className="pt-2 text-left space-y-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-[10px] font-black text-blue-200/60 uppercase tracking-[0.2em] ml-1">配置你的AI-APIkey</div>
+                    <button 
+                      type="button"
+                      onClick={handleUseFreeApi} disabled={thanksLoading}
+                      className="px-4 py-2 bg-blue-500/20 text-blue-300 rounded-xl font-black text-[9px] hover:bg-blue-500/30 transition-all flex items-center gap-2 border border-blue-500/30 uppercase tracking-widest"
+                    >
+                      {thanksLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Heart className="w-3 h-3 fill-current" />}
+                      使用免费 API (感谢阿旭)
+                    </button>
+                  </div>
                   <div className="flex bg-black/20 p-1.5 rounded-2xl border border-white/10">
                     <button type="button" onClick={() => setPromptTab('analyst')} className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${promptTab === 'analyst' ? 'bg-white text-[#1e1b4b] shadow-lg' : 'text-blue-200/60 hover:text-white'}`}>分析阶段</button>
                     <button type="button" onClick={() => setPromptTab('editor')} className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${promptTab === 'editor' ? 'bg-white text-[#1e1b4b] shadow-lg' : 'text-blue-200/60 hover:text-white'}`}>汇总阶段</button>
@@ -399,6 +467,78 @@ export default function ConfigWizard() {
                       className="w-full bg-black/20 border border-white/10 rounded-2xl p-5 text-sm font-sans focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none text-white" 
                     />
                   </div>
+                </div>
+              </ModuleCard>
+
+              <ModuleCard id="kdocs" title="04. 轻维表推送配置（可选）" active={activeModule === 'kdocs'} result={results.kdocs} loading={loading.kdocs} onActive={() => setActiveModule(activeModule === 'kdocs' ? null : 'kdocs')} onTest={() => testAndSave('kdocs')} icon={<LayoutDashboard />}>
+                <div className="pt-2 text-left space-y-6">
+                  <div className="flex items-center gap-3 p-4 bg-blue-500/10 rounded-2xl border border-blue-500/20">
+                    <Info className="w-5 h-5 text-blue-300 flex-shrink-0" />
+                    <div className="text-xs text-blue-200 leading-relaxed">
+                      <p className="font-bold mb-1">轻维表推送功能</p>
+                      <p>配置后，系统将在推送到机器人的同时，也将数据推送到您指定的金山文档轻维表中，方便后续查阅和分析。</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-4 bg-black/20 rounded-2xl border border-white/10">
+                    <input
+                      type="checkbox"
+                      name="enableKdocsPush"
+                      id="enableKdocsPush"
+                      checked={formState.enableKdocsPush}
+                      onChange={handleChange}
+                      className="w-5 h-5 rounded border-white/20 bg-black/40 text-blue-500 focus:ring-2 focus:ring-blue-500"
+                    />
+                    <label htmlFor="enableKdocsPush" className="text-sm font-bold text-white cursor-pointer">
+                      启用轻维表推送
+                    </label>
+                  </div>
+
+                  {formState.enableKdocsPush && (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <Input 
+                        label="App ID" 
+                        name="kdocsAppId" 
+                        type="text"
+                        value={formState.kdocsAppId} 
+                        onChange={handleChange} 
+                        placeholder="从金山文档开放平台获取"
+                      />
+                      
+                      <Input 
+                        label="App Secret" 
+                        name="kdocsAppSecret" 
+                        type="password"
+                        value={formState.kdocsAppSecret} 
+                        onChange={handleChange} 
+                        placeholder="从金山文档开放平台获取"
+                      />
+                      
+                      <Input 
+                        label="轻维表 File Token" 
+                        name="kdocsFileToken" 
+                        type="text"
+                        value={formState.kdocsFileToken} 
+                        onChange={handleChange} 
+                        placeholder="从轻维表文档 URL 中提取"
+                      />
+                      
+                      <Input 
+                        label="数据表 ID (DBSheet ID)" 
+                        name="kdocsDBSheetId" 
+                        type="text"
+                        value={formState.kdocsDBSheetId} 
+                        onChange={handleChange} 
+                        placeholder="轻维表数据表的 ID，可通过 API 获取"
+                      />
+
+                      <div className="p-3 bg-yellow-500/10 rounded-xl border border-yellow-500/20">
+                        <p className="text-xs text-yellow-200 leading-relaxed">
+                          <strong className="font-bold">提示：</strong> 请确保轻维表中已创建以下字段：日期、今日焦点、分类数量、文章总数、简报内容。字段名称需与代码中保持一致。
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </ModuleCard>
             </div>

@@ -1,8 +1,9 @@
 import { inngest } from "../client";
-import { getSettings, getRSSSources, savePushLog } from "@/lib/redis";
+import { getSettings, getRSSSources, savePushLog, saveSettings, getPushChannels, getAllThemePushConfigs, getThemePushConfig, PushChannel } from "@/lib/redis";
 import { fetchNewItems } from "@/lib/rss-utils";
-import { analyzeItem, writeCategorySection, generateTLDR } from "@/lib/ai-service";
+import { analyzeItem, writeCategorySection, generateTLDR, shortenContent, filterTopItems } from "@/lib/ai-service";
 import { getAllActiveUsers } from "@/lib/auth";
+import { pushDigestToKdocs, getFirstDBSheetId } from "@/lib/kdocs-api";
 
 const CATEGORY_MAP: Record<string, string> = {
   'Product': '📱 竞品动态',
@@ -88,15 +89,20 @@ export const digestWorker = inngest.createFunction(
     }
 
     const newItems = await step.run("fetch-and-dedupe", async () => {
-      return await fetchNewItems(userId, rssSources);
+      return await fetchNewItems(userId, rssSources, settings?.superSubKeyword);
     });
 
     if (newItems.length === 0) return { status: "completed", reason: "No new items" };
 
+    // AI 预筛选：从海量标题中选出最值得分析的 20 条
+    const filteredItems = await step.run("pre-filter-items", async () => {
+      return await filterTopItems(newItems, settings!);
+    });
+
     // AI 分析（串行 + 延迟）
     const analyzedItems = await step.run("analyze-items", async () => {
       const results = [];
-      for (const item of newItems) {
+      for (const item of filteredItems) {
         const result = await analyzeItem(item, settings!);
         results.push(result);
         console.log(`[AI 评分] ${result.score}分 - ${result.title.substring(0, 30)}...`);
@@ -179,16 +185,206 @@ export const digestWorker = inngest.createFunction(
       lines.push("");
       lines.push("> 本报告由 Weave 编织生成");
       
-      const reportContent = lines.join("\n");
+      let reportContent = lines.join("\n");
       
-      console.log("简报总长度:", reportContent.length, "字符");
+      // 【新增】：长度校验与 AI 自动精简逻辑
+      const MAX_LENGTH = 4800; // 预留余量
+      let retryCount = 0;
+      const MAX_RETRIES = 2;
+
+      while (reportContent.length > MAX_LENGTH && retryCount < MAX_RETRIES) {
+        console.log(`⚠️ 内容超长 (${reportContent.length}字)，正在进行第 ${retryCount + 1} 次 AI 精简...`);
+        const shortened = await shortenContent(reportContent, settings!);
+        if (shortened && shortened.length < reportContent.length) {
+          reportContent = shortened;
+        } else {
+          console.log("❌ AI 精简未能显著减少字数，跳过本次尝试");
+        }
+        retryCount++;
+      }
+
+      // 如果依然超长，进行硬截断（保底方案）
+      if (reportContent.length > 5000) {
+        console.log("🚨 AI 精简后依然超长，执行硬截断保底...");
+        reportContent = reportContent.substring(0, 4900) + "\n\n...(内容过长已截断)";
+      }
+      
+      console.log("最终简报长度:", reportContent.length, "字符");
       console.log("前300字预览:\n", reportContent.substring(0, 300));
 
-      if (settings!.webhookUrl) {
+      // 推送结果
+      const pushResults: any = {
+        channels: {},
+      };
+
+      // 获取推送渠道和订阅配置
+      const channels = await getPushChannels(userId);
+      const themeConfigs = await getAllThemePushConfigs(userId);
+      const subscribedThemes = settings.subscribedThemes || [];
+
+      // 收集需要推送的渠道（去重）
+      const channelsToPush = new Map<string, { channel: PushChannel; isPrimary: boolean }>();
+
+      // 遍历已订阅的主题，收集推送渠道
+      for (const themeId of subscribedThemes) {
+        const themeConfig = themeConfigs[themeId];
+        
+        if (themeConfig) {
+          // 使用订阅的推送渠道配置
+          const primaryChannel = channels.find(c => c.id === themeConfig.primaryChannelId);
+          if (primaryChannel && primaryChannel.enabled !== false) {
+            channelsToPush.set(primaryChannel.id, { channel: primaryChannel, isPrimary: true });
+          }
+
+          if (themeConfig.secondaryChannelIds) {
+            for (const channelId of themeConfig.secondaryChannelIds) {
+              const channel = channels.find(c => c.id === channelId);
+              if (channel && channel.enabled !== false) {
+                channelsToPush.set(channel.id, { channel, isPrimary: false });
+              }
+            }
+          }
+        }
+      }
+
+      // 如果没有订阅配置，使用全局配置（向后兼容）
+      if (channelsToPush.size === 0) {
+        // 使用旧的全局 webhook 配置
+        if (settings!.webhookUrl) {
+          channelsToPush.set('legacy-webhook', {
+            channel: {
+              id: 'legacy-webhook',
+              type: 'webhook',
+              name: '默认机器人',
+              webhookUrl: settings!.webhookUrl,
+              enabled: true,
+            } as PushChannel,
+            isPrimary: true,
+          });
+        }
+
+        // 使用旧的全局轻维表配置
+        if (settings!.enableKdocsPush && settings!.kdocsAppId && settings!.kdocsAppSecret && settings!.kdocsFileToken) {
+          channelsToPush.set('legacy-kdocs', {
+            channel: {
+              id: 'legacy-kdocs',
+              type: 'kdocs',
+              name: '默认轻维表',
+              kdocsAppId: settings!.kdocsAppId,
+              kdocsAppSecret: settings!.kdocsAppSecret,
+              kdocsFileToken: settings!.kdocsFileToken,
+              kdocsDBSheetId: settings!.kdocsDBSheetId,
+              enabled: true,
+            } as PushChannel,
+            isPrimary: false,
+          });
+        }
+      }
+
+      // 推送到所有收集到的渠道
+      for (const [channelId, { channel, isPrimary }] of channelsToPush) {
+        try {
+          if (channel.type === 'webhook' && channel.webhookUrl) {
+            // 推送到 Webhook
+            console.log(`=== 推送到 ${channel.name} (${isPrimary ? '主渠道' : '辅助渠道'}) ===`);
+            
+            const payload = {
+              msgtype: "markdown",
+              markdown: {
+                text: reportContent
+              }
+            };
+            
+            const response = await fetch(channel.webhookUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+
+            const responseText = await response.text();
+            let result;
+            try {
+              result = JSON.parse(responseText);
+            } catch (e) {
+              result = { raw: responseText };
+            }
+            
+            if (response.status === 200 || response.ok) {
+              console.log(`✅ 推送到 ${channel.name} 成功！`);
+              pushResults.channels[channelId] = { success: true, type: 'webhook', name: channel.name, response: result };
+            } else {
+              console.error(`❌ 推送到 ${channel.name} 失败:`, result);
+              pushResults.channels[channelId] = { success: false, type: 'webhook', name: channel.name, error: result };
+            }
+          } else if (channel.type === 'email' && channel.emailAddress) {
+            // 推送到邮箱（TODO: 实现邮箱推送逻辑）
+            console.log(`⚠️  邮箱推送功能待实现: ${channel.emailAddress}`);
+            pushResults.channels[channelId] = { success: false, type: 'email', name: channel.name, error: '邮箱推送功能待实现' };
+          } else if (channel.type === 'kdocs') {
+            // 推送到轻维表
+            console.log(`=== 推送到轻维表 ${channel.name} (${isPrimary ? '主渠道' : '辅助渠道'}) ===`);
+            
+            if (!channel.kdocsAppId || !channel.kdocsAppSecret || !channel.kdocsFileToken) {
+              console.error(`❌ 轻维表 ${channel.name} 配置不完整`);
+              pushResults.channels[channelId] = { success: false, type: 'kdocs', name: channel.name, error: '配置不完整' };
+              continue;
+            }
+
+            let dbSheetId = channel.kdocsDBSheetId;
+            if (!dbSheetId) {
+              console.log("⚠️  DBSheet ID 为空，尝试自动获取...");
+              const firstSheetId = await getFirstDBSheetId(
+                channel.kdocsAppId,
+                channel.kdocsAppSecret,
+                channel.kdocsFileToken
+              );
+              if (firstSheetId) {
+                dbSheetId = firstSheetId;
+                console.log(`✅ 自动获取到 DBSheet ID: ${dbSheetId}`);
+              } else {
+                console.error("❌ 无法自动获取 DBSheet ID");
+                pushResults.channels[channelId] = { success: false, type: 'kdocs', name: channel.name, error: 'DBSheet ID 未配置且无法自动获取' };
+                continue;
+              }
+            }
+            
+            const today = new Date().toISOString().split('T')[0];
+            const kdocsResult = await pushDigestToKdocs(
+              channel.kdocsAppId,
+              channel.kdocsAppSecret,
+              channel.kdocsFileToken,
+              dbSheetId,
+              {
+                date: today,
+                tldr: tldr || '',
+                categories: sections.map(s => ({ name: s.category, content: s.content })),
+                totalItems: highQualityItems.length,
+                reportContent: reportContent,
+              }
+            );
+
+            if (kdocsResult.success) {
+              console.log(`✅ 推送到轻维表 ${channel.name} 成功！记录ID: ${kdocsResult.recordId}`);
+              pushResults.channels[channelId] = { success: true, type: 'kdocs', name: channel.name, recordId: kdocsResult.recordId };
+            } else {
+              console.error(`❌ 推送到轻维表 ${channel.name} 失败:`, kdocsResult.error);
+              pushResults.channels[channelId] = { success: false, type: 'kdocs', name: channel.name, error: kdocsResult.error };
+            }
+          }
+        } catch (error: any) {
+          console.error(`❌ 推送到 ${channel.name} 异常:`, error);
+          pushResults.channels[channelId] = { success: false, type: channel.type, name: channel.name, error: error.message };
+        }
+      }
+
+      // 向后兼容：如果没有新配置，使用旧的推送逻辑
+      if (channelsToPush.size === 0 && settings!.webhookUrl) {
+        // 使用旧的全局 webhook 配置
+        console.log("=== 使用全局 Webhook 配置（向后兼容）===");
         const payload = {
           msgtype: "markdown",
           markdown: {
-            text: reportContent  // 关键：WPS 要求字段名是 text
+            text: reportContent
           }
         };
         
@@ -199,10 +395,6 @@ export const digestWorker = inngest.createFunction(
         });
 
         const responseText = await response.text();
-        console.log("=== WPS 响应 ===");
-        console.log("状态码:", response.status);
-        console.log("响应:", responseText);
-        
         let result;
         try {
           result = JSON.parse(responseText);
@@ -211,31 +403,159 @@ export const digestWorker = inngest.createFunction(
         }
         
         if (response.status === 200 || response.ok) {
-          console.log("✅ 简报发送成功！");
-          await savePushLog(userId, {
-            status: 'success',
-            details: {
-              themeCount: settings.subscribedThemes?.length || 0,
-              sourceCount: rssSources.length
-            }
-          });
-          return { status: "sent", length: reportContent.length, wps_response: result };
+          console.log("✅ 简报发送到机器人成功！");
+          pushResults.channels['legacy-webhook'] = { success: true, type: 'webhook', name: '默认机器人', response: result };
         } else {
-          console.error("❌ 发送失败:", result);
-          await savePushLog(userId, {
-            status: 'failed',
-            error: typeof result === 'string' ? result : JSON.stringify(result),
-            details: {
-              themeCount: settings.subscribedThemes?.length || 0,
-              sourceCount: rssSources.length
-            }
-          });
-          return { status: "failed", error: result };
+          console.error("❌ 发送到机器人失败:", result);
+          pushResults.channels['legacy-webhook'] = { success: false, type: 'webhook', name: '默认机器人', error: result };
         }
       }
-      return { status: "no_webhook" };
+
+      // 记录推送日志
+      const channelResults = Object.values(pushResults.channels);
+      const hasSuccess = channelResults.some((r: any) => r.success);
+      const hasFailure = channelResults.some((r: any) => !r.success);
+      
+      await savePushLog(userId, {
+        status: hasSuccess ? 'success' : 'failed',
+        error: hasFailure ? JSON.stringify(pushResults) : undefined,
+        details: {
+          themeCount: settings.subscribedThemes?.length || 0,
+          sourceCount: rssSources.length,
+          channelCount: channelResults.length,
+          successCount: channelResults.filter((r: any) => r.success).length,
+        }
+      });
+
+      // 返回结果
+      if (channelResults.length > 0) {
+        return {
+          status: hasSuccess ? "sent" : "partial_failed",
+          length: reportContent.length,
+          pushResults,
+        };
+      }
+      
+      return { status: "no_push_target" };
     });
 
     return finalReport;
+  }
+);
+
+/**
+ * 测试推送：立即测试指定渠道的推送功能
+ */
+export const testPushWorker = inngest.createFunction(
+  { id: "test-push-worker", name: "测试推送工作器" },
+  { event: "digest/test-push" },
+  async ({ event, step }) => {
+    const { userId, themeId, channelId } = event.data as { userId: string; themeId: string; channelId: string };
+    
+    console.log(`🧪 开始测试推送: userId=${userId}, themeId=${themeId}, channelId=${channelId}`);
+
+    // 获取推送渠道
+    const channels = await step.run("get-channels", async () => {
+      return await getPushChannels(userId);
+    });
+
+    const channel = channels.find(c => c.id === channelId);
+    if (!channel || channel.enabled === false) {
+      return { success: false, error: "推送渠道不存在或已禁用" };
+    }
+
+    // 生成测试消息
+    const testMessage = `# 🧪 推送测试消息
+
+**测试时间**: ${new Date().toLocaleString('zh-CN')}
+**主题**: ${themeId}
+**推送渠道**: ${channel.name}
+
+这是一条测试消息，用于验证推送渠道是否正常工作。
+
+如果您收到这条消息，说明推送配置正确！✅`;
+
+    const pushResult = await step.run("push-to-channel", async () => {
+      try {
+        if (channel.type === 'webhook' && channel.webhookUrl) {
+          // 推送到 Webhook
+          const payload = {
+            msgtype: "markdown",
+            markdown: {
+              text: testMessage
+            }
+          };
+          
+          const response = await fetch(channel.webhookUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          const responseText = await response.text();
+          let result;
+          try {
+            result = JSON.parse(responseText);
+          } catch (e) {
+            result = { raw: responseText };
+          }
+          
+          if (response.status === 200 || response.ok) {
+            return { success: true, type: 'webhook', name: channel.name, response: result };
+          } else {
+            return { success: false, type: 'webhook', name: channel.name, error: result };
+          }
+        } else if (channel.type === 'email' && channel.emailAddress) {
+          // 邮箱推送（待实现）
+          return { success: false, type: 'email', name: channel.name, error: '邮箱推送功能待实现' };
+        } else if (channel.type === 'kdocs') {
+          // 推送到轻维表
+          if (!channel.kdocsAppId || !channel.kdocsAppSecret || !channel.kdocsFileToken) {
+            return { success: false, type: 'kdocs', name: channel.name, error: '配置不完整' };
+          }
+
+          let dbSheetId = channel.kdocsDBSheetId;
+          if (!dbSheetId) {
+            const firstSheetId = await getFirstDBSheetId(
+              channel.kdocsAppId,
+              channel.kdocsAppSecret,
+              channel.kdocsFileToken
+            );
+            if (firstSheetId) {
+              dbSheetId = firstSheetId;
+            } else {
+              return { success: false, type: 'kdocs', name: channel.name, error: 'DBSheet ID 未配置且无法自动获取' };
+            }
+          }
+          
+          const today = new Date().toISOString().split('T')[0];
+          const kdocsResult = await pushDigestToKdocs(
+            channel.kdocsAppId,
+            channel.kdocsAppSecret,
+            channel.kdocsFileToken,
+            dbSheetId,
+            {
+              date: today,
+              tldr: '测试推送',
+              categories: [{ name: '测试', content: testMessage }],
+              totalItems: 1,
+              reportContent: testMessage,
+            }
+          );
+
+          if (kdocsResult.success) {
+            return { success: true, type: 'kdocs', name: channel.name, recordId: kdocsResult.recordId };
+          } else {
+            return { success: false, type: 'kdocs', name: channel.name, error: kdocsResult.error };
+          }
+        } else {
+          return { success: false, error: '不支持的推送渠道类型' };
+        }
+      } catch (error: any) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    return pushResult;
   }
 );

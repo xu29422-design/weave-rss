@@ -17,6 +17,132 @@ export interface Settings {
   configCompleted?: boolean; // 标记配置是否已全部完成
   configMode?: 'simple' | 'pro'; // 配置模式
   subscribedThemes?: string[]; // 已订阅的主题ID列表
+  superSubKeyword?: string; // 超级订阅关键词
+  // 推送渠道配置（全局配置池）
+  pushChannels?: PushChannel[]; // 推送渠道列表（机器人、邮箱、轻维表）
+}
+
+/**
+ * 推送渠道类型
+ */
+export type PushChannelType = 'webhook' | 'email' | 'kdocs';
+
+/**
+ * 推送渠道配置
+ */
+export interface PushChannel {
+  id: string; // 渠道唯一ID
+  type: PushChannelType; // 渠道类型
+  name: string; // 渠道名称（用户自定义）
+  // Webhook 配置
+  webhookUrl?: string; // Webhook URL（当 type 为 'webhook' 时）
+  // 邮箱配置
+  emailAddress?: string; // 邮箱地址（当 type 为 'email' 时）
+  // 轻维表配置
+  kdocsAppId?: string; // 金山文档 App ID（当 type 为 'kdocs' 时）
+  kdocsAppSecret?: string; // 金山文档 App Secret
+  kdocsFileToken?: string; // 轻维表文件 token
+  kdocsDBSheetId?: string; // 轻维表数据表 ID
+  // 通用配置
+  enabled?: boolean; // 是否启用
+  createdAt?: string; // 创建时间
+}
+
+/**
+ * 订阅的推送渠道配置
+ */
+export interface ThemePushConfig {
+  themeId: string; // 主题ID
+  primaryChannelId: string; // 主推送渠道ID（必须）
+  secondaryChannelIds?: string[]; // 辅助推送渠道ID列表（可选，如轻维表）
+}
+
+/**
+ * 获取订阅的推送渠道配置
+ */
+export async function getThemePushConfig(userId: string, themeId: string): Promise<ThemePushConfig | null> {
+  if (!globalKv) return null;
+  const key = `user:${userId}:theme_push_config:${themeId}`;
+  return await globalKv.get<ThemePushConfig>(key);
+}
+
+/**
+ * 保存订阅的推送渠道配置
+ */
+export async function saveThemePushConfig(userId: string, config: ThemePushConfig) {
+  if (!globalKv) throw new Error("KV 客户端未初始化");
+  const key = `user:${userId}:theme_push_config:${config.themeId}`;
+  await globalKv.set(key, config);
+}
+
+/**
+ * 获取所有订阅的推送渠道配置
+ */
+export async function getAllThemePushConfigs(userId: string): Promise<Record<string, ThemePushConfig>> {
+  if (!globalKv) return {};
+  // 获取所有主题推送配置
+  const keys = await globalKv.keys(`user:${userId}:theme_push_config:*`);
+  const configs: Record<string, ThemePushConfig> = {};
+  
+  for (const key of keys) {
+    const themeId = key.split(':').pop() || '';
+    const config = await globalKv.get<ThemePushConfig>(key);
+    if (config) {
+      configs[themeId] = config;
+    }
+  }
+  
+  return configs;
+}
+
+/**
+ * 获取用户的推送渠道列表
+ */
+export async function getPushChannels(userId: string): Promise<PushChannel[]> {
+  if (!globalKv) return [];
+  const settings = await getSettings(userId);
+  return settings?.pushChannels || [];
+}
+
+/**
+ * 保存推送渠道列表
+ */
+export async function savePushChannels(userId: string, channels: PushChannel[]) {
+  if (!globalKv) throw new Error("KV 客户端未初始化");
+  const settings = await getSettings(userId);
+  if (settings) {
+    await saveSettings(userId, { ...settings, pushChannels: channels });
+  }
+}
+
+/**
+ * 添加推送渠道
+ */
+export async function addPushChannel(userId: string, channel: PushChannel) {
+  const channels = await getPushChannels(userId);
+  channels.push(channel);
+  await savePushChannels(userId, channels);
+}
+
+/**
+ * 更新推送渠道
+ */
+export async function updatePushChannel(userId: string, channelId: string, updates: Partial<PushChannel>) {
+  const channels = await getPushChannels(userId);
+  const index = channels.findIndex(c => c.id === channelId);
+  if (index >= 0) {
+    channels[index] = { ...channels[index], ...updates };
+    await savePushChannels(userId, channels);
+  }
+}
+
+/**
+ * 删除推送渠道
+ */
+export async function deletePushChannel(userId: string, channelId: string) {
+  const channels = await getPushChannels(userId);
+  const filtered = channels.filter(c => c.id !== channelId);
+  await savePushChannels(userId, filtered);
 }
 
 /**

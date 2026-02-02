@@ -6,7 +6,7 @@ import {
   Users, Shield, Activity, Search, 
   Settings2, Database, Globe, ArrowLeft,
   Loader2, CheckCircle2, AlertCircle, RefreshCcw,
-  Mail, Lock, LogIn, ExternalLink, Rss, Heart
+  Mail, Lock, LogIn, ExternalLink, Rss, Heart, Zap, Sparkles, X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getAllUserStats } from "../config/admin-actions";
@@ -18,6 +18,12 @@ export default function AdminPage() {
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [error, setError] = useState("");
   const [isAuthorized, setIsAuthorized] = useState(false);
+  
+  // 详情弹窗状态
+  const [selectedLog, setSelectedLog] = useState<any>(null);
+  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [isUserIdModalOpen, setIsUserIdModalOpen] = useState(false);
   
   // 登录表单状态
   const [loginForm, setLoginForm] = useState({
@@ -215,9 +221,20 @@ export default function AdminPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-12">
           {[
             { label: "总用户数", value: stats.length, icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
-            { label: "活跃订阅", value: stats.reduce((acc, curr) => acc + (curr.settings?.subscribedThemes?.length || 0), 0), icon: Activity, color: "text-emerald-600", bg: "bg-emerald-50" },
-            { label: "RSS 源总数", value: stats.reduce((acc, curr) => acc + (curr.rssSources?.length || 0), 0), icon: Rss, color: "text-orange-600", bg: "bg-orange-50" },
-            { label: "系统状态", value: "正常", icon: CheckCircle2, color: "text-indigo-600", bg: "bg-indigo-50" },
+            { 
+              label: "用户反馈", 
+              value: feedbacks.filter(f => f.type === 'feedback').length, 
+              icon: Heart, 
+              color: "text-pink-600", 
+              bg: "bg-pink-50",
+              sub: [
+                { l: "点赞", v: feedbacks.filter(f => f.type === 'feedback' && (f.content?.type === 'like' || (typeof f.content === 'string' && f.content.includes('点赞')))).length },
+                { l: "建议", v: feedbacks.filter(f => f.type === 'feedback' && f.content?.type === 'suggestion').length },
+                { l: "吐槽", v: feedbacks.filter(f => f.type === 'feedback' && f.content?.type === 'complaint').length }
+              ]
+            },
+            { label: "推送成功", value: stats.reduce((acc, curr) => acc + (curr.pushLogs?.filter((l: any) => l.status === 'success').length || 0), 0), icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50" },
+            { label: "推送失败", value: stats.reduce((acc, curr) => acc + (curr.pushLogs?.filter((l: any) => l.status === 'failed').length || 0), 0), icon: AlertCircle, color: "text-red-600", bg: "bg-red-50" },
           ].map((item, i) => (
             <motion.div
               key={i}
@@ -233,7 +250,18 @@ export default function AdminPage() {
                 <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Live</span>
               </div>
               <div className="text-3xl font-bold text-slate-900 mb-1">{item.value}</div>
-              <div className="text-xs text-slate-500 font-medium">{item.label}</div>
+              <div className="text-xs text-slate-500 font-medium mb-2">{item.label}</div>
+              
+              {item.sub && (
+                <div className="flex gap-3 pt-3 border-t border-slate-50">
+                  {item.sub.map((s, idx) => (
+                    <div key={idx} className="flex flex-col">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase">{s.l}</span>
+                      <span className="text-xs font-black text-slate-700">{s.v}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </motion.div>
           ))}
         </div>
@@ -257,50 +285,58 @@ export default function AdminPage() {
                   className="group bg-white border border-slate-200 rounded-3xl p-6 hover:border-blue-200 hover:shadow-lg hover:shadow-blue-500/5 transition-all"
                 >
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 text-xl font-bold text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
+                    <div 
+                      className="flex items-center gap-3 min-w-[140px] max-w-[180px] cursor-pointer group/id"
+                      onClick={() => { setSelectedUserId(user.userId); setIsUserIdModalOpen(true); }}
+                    >
+                      <div className="w-8 h-8 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 text-sm font-bold text-slate-400 group-hover/id:bg-blue-50 group-hover/id:text-blue-500 transition-colors shrink-0">
                         {user.userId.substring(0, 1).toUpperCase()}
                       </div>
-                      <div>
-                        <div className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-bold text-slate-900 flex items-center gap-1.5 truncate group-hover/id:text-blue-600 transition-colors">
                           {user.userId}
                           {user.userId === "1159370261@qq.com" && (
-                            <span className="text-[9px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200 uppercase tracking-tighter font-bold">Admin</span>
+                            <span className="text-[8px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full border border-blue-200 uppercase font-black shrink-0">Admin</span>
                           )}
                         </div>
-                        <div className="text-xs text-slate-400 font-mono truncate max-w-[200px]">{user.settings?.webhookUrl || "未配置 Webhook"}</div>
+                        <div className="text-[10px] text-slate-400 font-mono truncate">{user.settings?.webhookUrl || "未配置 Webhook"}</div>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-8">
-                      <div className="space-y-1">
-                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">已订阅主题</div>
-                        <div className="flex gap-1.5">
-                          {user.settings?.subscribedThemes?.length > 0 ? (
-                            user.settings.subscribedThemes.map((theme: string) => (
-                              <span key={theme} className="text-[10px] bg-blue-50 border border-blue-100 px-2 py-1 rounded-lg text-blue-600 font-medium">
-                                {theme}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-[10px] text-slate-300 italic">无订阅</span>
-                          )}
+                    <div className="flex-1 flex items-center justify-end gap-8">
+                      <div className="text-right">
+                        <div className="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">推送时间</div>
+                        <div className="text-[10px] text-slate-600 font-medium">
+                          {user.settings?.pushTime || "8"}:00
                         </div>
                       </div>
 
-                      <div className="space-y-1">
-                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">推送配置</div>
-                        <div className="text-xs text-slate-600 flex items-center gap-2 font-medium">
-                          <Globe className="w-3 h-3 text-blue-500" />
-                          {user.settings?.aiProvider || "未设置"} · {user.settings?.pushTime || "8"}:00
+                      <div className="text-right">
+                        <div className="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">RSS源</div>
+                        <div className="text-[10px] text-slate-600 font-medium">
+                          {user.rssSources?.length || 0} 条
                         </div>
                       </div>
 
-                      <div className="space-y-1">
-                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">RSS 源</div>
-                        <div className="text-xs text-slate-600 font-mono font-medium">
-                          {user.rssSources?.length || 0} 个来源
+                      <div className="text-right">
+                        <div className="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">成功次数</div>
+                        <div className="text-[10px] text-emerald-600 font-black">
+                          {user.pushLogs?.filter((log: any) => log.status === 'success').length || 0} 次
                         </div>
+                      </div>
+
+                      {/* 状态标签：API 配置情况 */}
+                      <div className="flex gap-1.5 shrink-0 ml-2">
+                        {(!user.settings?.openaiApiKey && !user.settings?.geminiApiKey) ? (
+                          <span className="text-[9px] bg-red-50 text-red-500 px-2 py-1 rounded-lg border border-red-100 font-bold">未配 API</span>
+                        ) : (
+                          <div className="relative">
+                            <span className="text-[9px] bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg border border-emerald-100 font-bold">API 已配</span>
+                            {user.settings?.openaiApiKey === "fcd9114b61ff49259c8770eba426f6e5.eiMdQXWwcOi6SAu7" && (
+                              <span className="absolute -top-1.5 -right-1.5 text-[7px] bg-amber-500 text-white px-1 rounded-full font-black shadow-sm border border-white uppercase">Free</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -311,7 +347,11 @@ export default function AdminPage() {
                       <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-3">最近推送日志</div>
                       <div className="space-y-2">
                         {user.pushLogs.map((log: any) => (
-                          <div key={log.id} className="flex items-center justify-between text-[11px] bg-slate-50/50 p-2 rounded-xl border border-slate-100/50">
+                          <div 
+                            key={log.id} 
+                            onClick={() => { setSelectedLog({ ...log, userId: user.userId }); setIsLogModalOpen(true); }}
+                            className="flex items-center justify-between text-[11px] bg-slate-50/50 p-2 rounded-xl border border-slate-100/50 hover:bg-slate-100/50 cursor-pointer transition-colors group/log"
+                          >
                             <div className="flex items-center gap-3">
                               <div className={`w-1.5 h-1.5 rounded-full ${log.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`} />
                               <span className="text-slate-400 font-mono">
@@ -331,8 +371,11 @@ export default function AdminPage() {
                                 </span>
                               )}
                             </div>
-                            <div className="text-slate-400">
-                              {log.details?.sourceCount || 0} 源 / {log.details?.themeCount || 0} 主题
+                            <div className="flex items-center gap-2">
+                              <div className="text-slate-400">
+                                {log.details?.sourceCount || 0} 源 / {log.details?.themeCount || 0} 主题
+                              </div>
+                              <ExternalLink className="w-3 h-3 text-slate-300 opacity-0 group-hover/log:opacity-100 transition-opacity" />
                             </div>
                           </div>
                         ))}
@@ -386,6 +429,137 @@ export default function AdminPage() {
 
       {/* 底部装饰 */}
       <div className="fixed bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-100 to-transparent pointer-events-none" />
+
+      {/* 日志详情弹窗 */}
+      <AnimatePresence>
+        {isLogModalOpen && selectedLog && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setIsLogModalOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden border border-slate-200"
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${selectedLog.status === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                      {selectedLog.status === 'success' ? <CheckCircle2 className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-900">推送日志详情</h3>
+                      <p className="text-xs text-slate-400 font-medium uppercase tracking-widest mt-0.5">
+                        {new Date(selectedLog.timestamp).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setIsLogModalOpen(false)}
+                    className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                      <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">用户 ID</div>
+                      <div className="text-sm font-bold text-slate-700 truncate">{selectedLog.userId}</div>
+                    </div>
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                      <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">推送状态</div>
+                      <div className={`text-sm font-bold ${selectedLog.status === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {selectedLog.status === 'success' ? '成功' : '失败'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-3">详细日志 / 错误信息</div>
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 font-mono text-xs text-slate-600 overflow-y-auto max-h-[300px] whitespace-pre-wrap break-all leading-relaxed">
+                      {selectedLog.error || (selectedLog.status === 'success' ? '推送成功，未返回错误信息。' : '未知错误')}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between px-2">
+                    <div className="flex gap-6">
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">订阅主题</div>
+                        <div className="text-sm font-bold text-slate-700">{selectedLog.details?.themeCount || 0} 个</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">RSS 来源</div>
+                        <div className="text-sm font-bold text-slate-700">{selectedLog.details?.sourceCount || 0} 个</div>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setIsLogModalOpen(false)}
+                      className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold text-sm hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10"
+                    >
+                      关闭详情
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* UserID 详情弹窗 */}
+      <AnimatePresence>
+        {isUserIdModalOpen && selectedUserId && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setIsUserIdModalOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-[32px] shadow-2xl overflow-hidden border border-slate-200"
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-slate-900">完整 UserID</h3>
+                  <button 
+                    onClick={() => setIsUserIdModalOpen(false)}
+                    className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-6">
+                  <div className="text-sm font-mono font-bold text-slate-700 break-all leading-relaxed">
+                    {selectedUserId}
+                  </div>
+                </div>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedUserId);
+                    alert("已复制到剪贴板");
+                  }}
+                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 flex items-center justify-center gap-2"
+                >
+                  复制 ID
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

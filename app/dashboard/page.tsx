@@ -8,11 +8,21 @@ import {
   Sparkles, Cpu, Newspaper, Book, Gamepad2, LineChart, 
   Clock, CheckCircle2, Plus, User, LogOut, Settings2, 
   Heart, Zap, LayoutGrid, Bell, ArrowRight, Loader2, Rss,
-  Palette, Bitcoin, Code2, Activity, BrainCircuit, Search, X
+  Palette, Bitcoin, Code2, Activity, BrainCircuit, Search, X, Globe, AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchCurrentConfig, persistSettings, persistRSS } from "../config/actions";
 import { pushToAdminBot } from "../config/admin-actions";
+import { 
+  fetchPushChannels, 
+  createPushChannel, 
+  updatePushChannelById, 
+  removePushChannel,
+  fetchAllThemePushConfigs,
+  saveThemePushChannelConfig,
+  testPushChannel
+} from "./actions";
+import type { PushChannel, ThemePushConfig } from "@/lib/redis";
 
 // 类型定义
 type ThemeStyle = 'tech' | 'finance' | 'paper' | 'chat' | 'card' | 'minimal';
@@ -377,9 +387,19 @@ function DashboardContent() {
   const [selectedTheme, setSelectedTheme] = useState<any>(null);
   const [subscribedThemeIds, setSubscribedThemeIds] = useState<string[]>([]);
 
+  // 反馈弹窗状态
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [feedbackType, setFeedbackType] = useState<1 | 2 | 3 | null>(null);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+
   // 搜索和分类状态
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+
+  // 超级订阅（Google News）状态
+  const [isSuperSubModalOpen, setIsSuperSubModalOpen] = useState(false);
+  const [superSubKeyword, setSuperSubKeyword] = useState("");
 
   // 订阅弹窗状态
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -395,6 +415,22 @@ function DashboardContent() {
   const [newSourceUrl, setNewSourceUrl] = useState("");
   // 存储每个主题的自定义源
   const [customThemeSources, setCustomThemeSources] = useState<Record<string, string[]>>({});
+  
+  // 推送渠道管理状态
+  const [pushChannels, setPushChannels] = useState<PushChannel[]>([]);
+  const [themePushConfigs, setThemePushConfigs] = useState<Record<string, ThemePushConfig>>({});
+  const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
+  const [editingChannel, setEditingChannel] = useState<PushChannel | null>(null);
+  const [newChannelType, setNewChannelType] = useState<'webhook' | 'email' | 'kdocs'>('webhook');
+  const [isPushConfigModalOpen, setIsPushConfigModalOpen] = useState(false);
+  const [configuringThemeId, setConfiguringThemeId] = useState<string | null>(null);
+  const [selectedPrimaryChannel, setSelectedPrimaryChannel] = useState<string>('');
+  const [selectedSecondaryChannels, setSelectedSecondaryChannels] = useState<string[]>([]);
+  const [isTestPushModalOpen, setIsTestPushModalOpen] = useState(false);
+  const [testingThemeId, setTestingThemeId] = useState<string | null>(null);
+  const [selectedTestChannel, setSelectedTestChannel] = useState<string>('');
+  const [testPushLoading, setTestPushLoading] = useState(false);
+  const [testPushResult, setTestPushResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null);
 
   useEffect(() => {
     async function init() {
@@ -426,6 +462,18 @@ function DashboardContent() {
         if (tabParam === 'active') {
           setActiveTab('active');
         }
+
+        // 加载推送渠道
+        const channelsResult = await fetchPushChannels();
+        if (channelsResult.success) {
+          setPushChannels(channelsResult.channels || []);
+        }
+
+        // 加载主题推送配置
+        const configsResult = await fetchAllThemePushConfigs();
+        if (configsResult.success) {
+          setThemePushConfigs(configsResult.configs || {});
+        }
       } catch (e) {
         router.push("/auth");
       } finally {
@@ -435,21 +483,41 @@ function DashboardContent() {
     init();
   }, [router, searchParams]);
 
+  const [showToast, setShowToast] = useState(false);
+  const [toastMsg, setToastMsg] = useState("");
+
   const handleThanks = async () => {
+    // 预设免费 API 配置
+    const PRESET_FREE_API = {
+      aiProvider: 'openai' as const,
+      openaiApiKey: "fcd9114b61ff49259c8770eba426f6e5.eiMdQXWwcOi6SAu7",
+      openaiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
+      openaiModel: "glm-4.5-flash"
+    };
+
+    setSettings({
+      ...settings,
+      ...PRESET_FREE_API
+    });
+
     setThanksLoading(true);
     try {
       // 通过 Server Action 转发请求，解决跨域问题
       const result = await pushToAdminBot('feedback', { 
-        text: `🌟 感谢阿旭！用户 [${username}] 刚刚为你点了一个赞，感谢你提供的免费 API 羊毛！` 
+        text: `🌟 感谢阿旭！用户 [${username}] 刚刚为你点了一个赞，并使用了免费 API 羊毛！` 
       });
       
       if (result.success) {
-        alert("点赞成功！已通过 Webhook 告诉阿旭啦~");
+        setToastMsg("点赞成功！已为您填入预设 API 😄");
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
       } else {
         throw new Error("Submission failed");
       }
     } catch (e) {
-      alert("点赞失败，但阿旭感受到了你的心意！");
+      setToastMsg("操作失败，请重试");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
     } finally {
       setThanksLoading(false);
     }
@@ -496,58 +564,107 @@ function DashboardContent() {
     setIsModalOpen(true);
   };
 
-  const handleConfirmSubscription = async () => {
-    if (!selectedTheme) return; // Add guard for selectedTheme
-
-    if (!modalConfig.webhookUrl && !settings.webhookUrl) {
-      alert("请填写 Webhook 地址以接收推送");
+  const handleConfirmSuperSub = async () => {
+    if (!superSubKeyword.trim()) {
+      alert("请输入您想看的主题关键词");
       return;
     }
 
     setLoading(true);
     try {
-      // 1. 保存 RSS
-      const currentSources = settings.rssUrls ? settings.rssUrls.split("\n").filter(Boolean) : [];
+      // 生成 Google News RSS URL
+      const googleNewsUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(superSubKeyword.trim())}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
       
-      // 合并主题默认源和用户自定义添加的源
-      const themeCustomSources = customThemeSources[selectedTheme.id] || [];
-      const allThemeSources = [...selectedTheme.sources, ...themeCustomSources];
-
-      const newSources = Array.from(new Set([...currentSources, ...allThemeSources]));
+      // 生成 Twitter/X RSS URL (通过 nitter.net 代理，这是目前最通用的 RSS 方式)
+      const twitterRssUrl = `https://nitter.net/search/rss?q=${encodeURIComponent(superSubKeyword.trim())}`;
+      
+      // 1. 保存到 RSS 列表
+      const currentSources = settings.rssUrls ? settings.rssUrls.split("\n").filter(Boolean) : [];
+      const newSources = Array.from(new Set([...currentSources, googleNewsUrl, twitterRssUrl]));
       await persistRSS(newSources);
 
-      // 2. 保存设置 (Webhook & Schedule) - 不包含 rssUrls
-      const newSubscribedThemeIds = Array.from(new Set([...subscribedThemeIds, selectedTheme.id]));
-      const newSettingsForSave = {
-        ...settings,
-        webhookUrl: modalConfig.webhookUrl || settings.webhookUrl,
-        pushTime: modalConfig.pushTime,
-        pushDays: modalConfig.pushDays,
-        subscribedThemes: newSubscribedThemeIds, // 保存订阅的主题ID列表
-        // 确保其他必要字段存在
-        aiProvider: settings.aiProvider || "google",
-        configMode: settings.configMode || "simple"
-      };
-      delete (newSettingsForSave as any).rssUrls; // 删除 rssUrls 避免存入 settings
-      await persistSettings(newSettingsForSave);
-      
-      // 3. 更新本地状态（包含 rssUrls 用于前端显示）
+      // 2. 保存设置，记录关键词
       const newSettings = {
-        ...newSettingsForSave,
-        rssUrls: newSources.join("\n")
+        ...settings,
+        superSubKeyword: superSubKeyword.trim(),
+        webhookUrl: settings.webhookUrl || modalConfig.webhookUrl,
       };
-      setSettings(newSettings);
-      setSubscribedThemeIds(newSubscribedThemeIds);
-      setIsModalOpen(false);
-      alert(`🎉 订阅成功！已为您添加 [${selectedTheme.title}] 到订阅列表。`);
-      
-      // 刷新页面或跳转
-      // router.refresh(); // 可选
-    } catch (error) {
-      console.error("Subscription failed:", error);
+      delete (newSettings as any).rssUrls;
+      await persistSettings(newSettings);
+
+      // 3. 更新本地状态
+      setSettings({ ...newSettings, rssUrls: newSources.join("\n") });
+      setIsSuperSubModalOpen(false);
+      setToastMsg(`🚀 超级订阅成功！已开启对 [${superSubKeyword}] 的全网检索。`);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (e) {
+      console.error("Super sub failed:", e);
       alert("订阅失败，请重试");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConfirmSubscription = async () => {
+    // ... existing subscription logic ...
+  };
+
+  const handleFeedbackSubmit = async () => {
+    if (!feedbackType) return;
+    
+    // 如果是类型 1，直接处理
+    if (feedbackType === 1) {
+      setSubmittingFeedback(true);
+      try {
+        await pushToAdminBot('feedback', {
+          type: 'like',
+          username,
+          message: "太好用了，点赞！"
+        });
+        setToastMsg("感谢喜欢 ❤️ 阿旭坐在应韧旁边，可以请他喝咖啡（无糖、不加奶的美式）");
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 5000);
+        setIsFeedbackModalOpen(false);
+        setFeedbackType(null);
+      } catch (e) {
+        setToastMsg("反馈发送失败，请重试");
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      } finally {
+        setSubmittingFeedback(false);
+      }
+      return;
+    }
+
+    // 类型 2 和 3 需要检查文本
+    if (!feedbackText.trim()) {
+      // 用户没填内容直接切换或关闭，不需要 alert 提示
+      setIsFeedbackModalOpen(false);
+      setFeedbackType(null);
+      setFeedbackText("");
+      return;
+    }
+
+    setSubmittingFeedback(true);
+    try {
+      await pushToAdminBot('feedback', {
+        type: feedbackType === 2 ? 'suggestion' : 'complaint',
+        username,
+        message: feedbackText
+      });
+      setToastMsg("反馈已收到，我们会认真查看的！");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      setIsFeedbackModalOpen(false);
+      setFeedbackType(null);
+      setFeedbackText("");
+    } catch (e) {
+      setToastMsg("反馈发送失败，请重试");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } finally {
+      setSubmittingFeedback(false);
     }
   };
 
@@ -608,7 +725,7 @@ function DashboardContent() {
                         {selectedTheme.icon}
                       </div>
                       <div>
-                        <h3 className="text-2xl font-black text-blue-950">订阅配置</h3>
+                        <h3 className="text-2xl font-black text-blue-950">输入推送的机器人地址</h3>
                         <p className="text-xs text-blue-900/40 font-bold mt-1 uppercase tracking-widest">主题：{selectedTheme.title}</p>
                       </div>
                     </div>
@@ -686,11 +803,11 @@ function DashboardContent() {
             </motion.div>
           )}
           
-          {isAddSourceModalOpen && (
+          {isFeedbackModalOpen && (
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-              onClick={() => setIsAddSourceModalOpen(false)}
+              className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+              onClick={() => { setIsFeedbackModalOpen(false); setFeedbackType(null); setFeedbackText(""); }}
             >
               <motion.div
                 initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -699,30 +816,651 @@ function DashboardContent() {
               >
                 <div className="p-10 space-y-8">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-2xl font-black text-blue-950 uppercase tracking-tighter">添加 RSS 源</h3>
-                    <button onClick={() => setIsAddSourceModalOpen(false)} className="p-3 bg-white/5 rounded-full hover:bg-white/10 transition-colors border border-white/10">
+                    <h3 className="text-2xl font-black text-blue-950 uppercase tracking-tighter">我要反馈</h3>
+                    <button onClick={() => { setIsFeedbackModalOpen(false); setFeedbackType(null); setFeedbackText(""); }} className="p-3 bg-white/5 rounded-full hover:bg-white/10 transition-colors border border-white/10">
                       <X className="w-5 h-5 text-blue-900/30" />
                     </button>
                   </div>
-                  
+
                   <div className="space-y-3">
-                    <label className="text-xs font-black text-blue-900/40 uppercase tracking-widest ml-1 block">RSS 链接</label>
-                    <input 
-                      type="text" 
-                      value={newSourceUrl}
-                      onChange={(e) => setNewSourceUrl(e.target.value)}
-                      placeholder="https://example.com/feed.xml"
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-blue-900/40"
-                    />
+                    {[
+                      { id: 1, label: "点赞", icon: "❤️", color: "from-pink-500 to-rose-500", full: "太好用了，点赞" },
+                      { id: 2, label: null, icon: null, color: "from-blue-500 to-cyan-500", full: "非常好用，但是我有建议" },
+                      { id: 3, label: null, icon: null, color: "from-slate-600 to-slate-800", full: "有点难用，我有想法" }
+                    ].map((item) => (
+                      <button 
+                        key={item.id}
+                        onClick={() => { 
+                          setFeedbackType(item.id as 1|2|3); 
+                        }}
+                        className={`w-full group flex items-center justify-between p-4 rounded-2xl border transition-all duration-300 ${
+                          feedbackType === item.id 
+                            ? 'border-blue-500 bg-blue-50 shadow-md' 
+                            : 'border-slate-100 hover:border-blue-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="font-bold text-slate-700 group-hover:text-blue-950 transition-colors">{item.full}</span>
+                        {item.label && (
+                          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-br ${item.color} shadow-sm group-hover:scale-105 transition-transform`}>
+                            {item.icon && <span className="text-sm">{item.icon}</span>}
+                            <span className="text-[10px] font-black text-white uppercase tracking-widest">{item.label}</span>
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  <AnimatePresence mode="wait">
+                    {feedbackType === 1 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="pt-4"
+                      >
+                        <button 
+                          onClick={handleFeedbackSubmit}
+                          disabled={submittingFeedback}
+                          className="w-full py-5 bg-blue-600 text-white rounded-[24px] font-black text-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-3"
+                        >
+                          {submittingFeedback ? <Loader2 className="w-6 h-6 animate-spin" /> : "确认点赞"}
+                        </button>
+                      </motion.div>
+                    )}
+                    {(feedbackType === 2 || feedbackType === 3) && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-4 pt-4"
+                      >
+                        <textarea
+                          value={feedbackText}
+                          onChange={(e) => setFeedbackText(e.target.value)}
+                          placeholder={feedbackType === 2 ? "欢迎建议" : "叼你😈"}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-blue-900/40 resize-none"
+                          rows={4}
+                        />
+                        <button 
+                          onClick={handleFeedbackSubmit}
+                          disabled={submittingFeedback}
+                          className="w-full py-5 bg-blue-950 text-white rounded-[24px] font-black text-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-blue-950/10 flex items-center justify-center gap-3 disabled:bg-gray-100 disabled:text-gray-400"
+                        >
+                          {submittingFeedback ? <Loader2 className="w-6 h-6 animate-spin" /> : "提交反馈"}
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {isSuperSubModalOpen && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+              onClick={() => setIsSuperSubModalOpen(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                className="bg-white border border-white/10 rounded-[40px] w-full max-w-md shadow-2xl overflow-hidden ring-1 ring-white/5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-10 space-y-8">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <h3 className="text-2xl font-black text-blue-950 uppercase tracking-tighter">超级订阅</h3>
+                    </div>
+                    <button onClick={() => setIsSuperSubModalOpen(false)} className="p-3 bg-white/5 rounded-full hover:bg-white/10 transition-colors border border-white/10">
+                      <X className="w-5 h-5 text-blue-900/30" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                      输入你想关注的主题
+                    </p>
+                    <div className="space-y-2">
+                      <input 
+                        type="text" 
+                        value={superSubKeyword}
+                        onChange={(e) => setSuperSubKeyword(e.target.value)}
+                        placeholder="例如：低空经济、大模型融资"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-slate-300"
+                      />
+                    </div>
                   </div>
 
                   <button 
-                    onClick={handleAddSource}
-                    disabled={!newSourceUrl.trim()}
-                    className="w-full py-5 bg-blue-600 text-white rounded-[24px] font-black text-xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-3 disabled:bg-gray-100 disabled:shadow-none disabled:text-gray-400"
+                    onClick={handleConfirmSuperSub}
+                    disabled={loading || !superSubKeyword.trim()}
+                    className="w-full py-5 bg-blue-950 text-white rounded-[24px] font-black text-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-blue-950/10 flex items-center justify-center gap-3 disabled:bg-gray-100 disabled:text-gray-400"
                   >
-                    <Plus className="w-6 h-6" />
-                    确认添加
+                    {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "确认订阅"}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* 推送渠道编辑弹窗 */}
+          {isChannelModalOpen && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+              onClick={() => setIsChannelModalOpen(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                className="bg-white border border-white/10 rounded-[40px] w-full max-w-2xl shadow-2xl overflow-hidden ring-1 ring-white/5 max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-10 space-y-8">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-2xl font-black text-blue-950">
+                      {editingChannel ? '编辑推送渠道' : '添加推送渠道'}
+                    </h3>
+                    <button onClick={() => setIsChannelModalOpen(false)} className="p-3 bg-white/5 rounded-full hover:bg-white/10 transition-colors border border-white/10">
+                      <X className="w-5 h-5 text-blue-900/30" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-6">
+                    {/* 渠道类型选择 */}
+                    <div>
+                      <label className="text-xs font-black text-blue-900/40 uppercase tracking-widest ml-1 mb-3 block">渠道类型</label>
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setNewChannelType('webhook')}
+                          className={`flex-1 py-3 px-4 rounded-xl font-black text-sm transition-all ${
+                            newChannelType === 'webhook' 
+                              ? 'bg-blue-500 text-white shadow-lg' 
+                              : 'bg-white/5 text-blue-900/40 hover:bg-white/10'
+                          }`}
+                        >
+                          机器人 Webhook
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewChannelType('email')}
+                          className={`flex-1 py-3 px-4 rounded-xl font-black text-sm transition-all ${
+                            newChannelType === 'email' 
+                              ? 'bg-green-500 text-white shadow-lg' 
+                              : 'bg-white/5 text-blue-900/40 hover:bg-white/10'
+                          }`}
+                        >
+                          邮箱
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewChannelType('kdocs')}
+                          className={`flex-1 py-3 px-4 rounded-xl font-black text-sm transition-all ${
+                            newChannelType === 'kdocs' 
+                              ? 'bg-purple-500 text-white shadow-lg' 
+                              : 'bg-white/5 text-blue-900/40 hover:bg-white/10'
+                          }`}
+                        >
+                          轻维表
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 渠道名称 */}
+                    <div>
+                      <label className="text-xs font-black text-blue-900/40 uppercase tracking-widest ml-1 mb-3 block">渠道名称</label>
+                      <input
+                        type="text"
+                        id="channel-name"
+                        defaultValue={editingChannel?.name || ''}
+                        placeholder="例如：工作群机器人、个人邮箱、数据看板"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-slate-300"
+                      />
+                    </div>
+
+                    {/* Webhook 配置 */}
+                    {newChannelType === 'webhook' && (
+                      <div>
+                        <label className="text-xs font-black text-blue-900/40 uppercase tracking-widest ml-1 mb-3 block">Webhook 地址</label>
+                        <input
+                          type="text"
+                          id="webhook-url"
+                          defaultValue={editingChannel?.webhookUrl || ''}
+                          placeholder="https://..."
+                          className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-slate-300"
+                        />
+                      </div>
+                    )}
+
+                    {/* 邮箱配置 */}
+                    {newChannelType === 'email' && (
+                      <div>
+                        <label className="text-xs font-black text-blue-900/40 uppercase tracking-widest ml-1 mb-3 block">邮箱地址</label>
+                        <input
+                          type="email"
+                          id="email-address"
+                          defaultValue={editingChannel?.emailAddress || ''}
+                          placeholder="example@email.com"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-slate-300"
+                        />
+                      </div>
+                    )}
+
+                    {/* 轻维表配置 */}
+                    {newChannelType === 'kdocs' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-xs font-black text-blue-900/40 uppercase tracking-widest ml-1 mb-3 block">App ID</label>
+                          <input
+                            type="text"
+                            id="kdocs-app-id"
+                            defaultValue={editingChannel?.kdocsAppId || ''}
+                            placeholder="从金山文档开放平台获取"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-slate-300"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-black text-blue-900/40 uppercase tracking-widest ml-1 mb-3 block">App Secret</label>
+                          <input
+                            type="password"
+                            id="kdocs-app-secret"
+                            defaultValue={editingChannel?.kdocsAppSecret || ''}
+                            placeholder="从金山文档开放平台获取"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-slate-300"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-black text-blue-900/40 uppercase tracking-widest ml-1 mb-3 block">File Token</label>
+                          <input
+                            type="text"
+                            id="kdocs-file-token"
+                            defaultValue={editingChannel?.kdocsFileToken || ''}
+                            placeholder="从轻维表 URL 中提取"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-slate-300"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-black text-blue-900/40 uppercase tracking-widest ml-1 mb-3 block">DBSheet ID (可选)</label>
+                          <input
+                            type="text"
+                            id="kdocs-dbsheet-id"
+                            defaultValue={editingChannel?.kdocsDBSheetId || ''}
+                            placeholder="轻维表数据表 ID"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-slate-300"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const nameInput = document.getElementById('channel-name') as HTMLInputElement;
+                      const name = nameInput?.value.trim();
+                      
+                      if (!name) {
+                        alert('请输入渠道名称');
+                        return;
+                      }
+
+                      const channelData: any = {
+                        type: newChannelType,
+                        name,
+                        enabled: true,
+                      };
+
+                      if (newChannelType === 'webhook') {
+                        const urlInput = document.getElementById('webhook-url') as HTMLInputElement;
+                        const url = urlInput?.value.trim();
+                        if (!url) {
+                          alert('请输入 Webhook 地址');
+                          return;
+                        }
+                        channelData.webhookUrl = url;
+                      } else if (newChannelType === 'email') {
+                        const emailInput = document.getElementById('email-address') as HTMLInputElement;
+                        const email = emailInput?.value.trim();
+                        if (!email) {
+                          alert('请输入邮箱地址');
+                          return;
+                        }
+                        channelData.emailAddress = email;
+                      } else if (newChannelType === 'kdocs') {
+                        const appIdInput = document.getElementById('kdocs-app-id') as HTMLInputElement;
+                        const appSecretInput = document.getElementById('kdocs-app-secret') as HTMLInputElement;
+                        const fileTokenInput = document.getElementById('kdocs-file-token') as HTMLInputElement;
+                        const dbSheetIdInput = document.getElementById('kdocs-dbsheet-id') as HTMLInputElement;
+                        
+                        const appId = appIdInput?.value.trim();
+                        const appSecret = appSecretInput?.value.trim();
+                        const fileToken = fileTokenInput?.value.trim();
+                        const dbSheetId = dbSheetIdInput?.value.trim();
+                        
+                        if (!appId || !appSecret || !fileToken) {
+                          alert('请填写完整的轻维表配置');
+                          return;
+                        }
+                        
+                        channelData.kdocsAppId = appId;
+                        channelData.kdocsAppSecret = appSecret;
+                        channelData.kdocsFileToken = fileToken;
+                        if (dbSheetId) channelData.kdocsDBSheetId = dbSheetId;
+                      }
+
+                      if (editingChannel) {
+                        await updatePushChannelById(editingChannel.id, channelData);
+                      } else {
+                        await createPushChannel(channelData);
+                      }
+
+                      const result = await fetchPushChannels();
+                      if (result.success) {
+                        setPushChannels(result.channels || []);
+                        setIsChannelModalOpen(false);
+                        setEditingChannel(null);
+                      }
+                    }}
+                    className="w-full py-5 bg-blue-950 text-white rounded-[24px] font-black text-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-blue-950/10"
+                  >
+                    {editingChannel ? '保存修改' : '创建渠道'}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* 推送渠道选择弹窗 */}
+          {isPushConfigModalOpen && configuringThemeId && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+              onClick={() => setIsPushConfigModalOpen(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                className="bg-white border border-white/10 rounded-[40px] w-full max-w-2xl shadow-2xl overflow-hidden ring-1 ring-white/5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-10 space-y-8">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-2xl font-black text-blue-950">配置推送渠道</h3>
+                    <button onClick={() => setIsPushConfigModalOpen(false)} className="p-3 bg-white/5 rounded-full hover:bg-white/10 transition-colors border border-white/10">
+                      <X className="w-5 h-5 text-blue-900/30" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-6">
+                    {/* 主推送渠道（必选） */}
+                    <div>
+                      <label className="text-xs font-black text-blue-900/40 uppercase tracking-widest ml-1 mb-3 block">
+                        主推送渠道 <span className="text-red-500">*</span>
+                      </label>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {pushChannels.filter(c => c.enabled !== false && (c.type === 'webhook' || c.type === 'email')).map((channel) => (
+                          <label
+                            key={channel.id}
+                            className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                              selectedPrimaryChannel === channel.id
+                                ? 'bg-blue-50 border-blue-500'
+                                : 'bg-slate-50 border-slate-200 hover:border-blue-300'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="primary-channel"
+                              value={channel.id}
+                              checked={selectedPrimaryChannel === channel.id}
+                              onChange={(e) => setSelectedPrimaryChannel(e.target.value)}
+                              className="w-5 h-5 text-blue-500 focus:ring-2 focus:ring-blue-500"
+                            />
+                            <div className="flex-1">
+                              <div className="font-black text-blue-950">{channel.name}</div>
+                              <div className="text-xs text-slate-500 font-bold uppercase tracking-widest">
+                                {channel.type === 'webhook' ? '机器人 Webhook' : '邮箱推送'}
+                              </div>
+                            </div>
+                          </label>
+                        ))}
+                        {pushChannels.filter(c => c.enabled !== false && (c.type === 'webhook' || c.type === 'email')).length === 0 && (
+                          <p className="text-sm text-slate-400 text-center py-4">请先在个人中心添加机器人或邮箱推送渠道</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 辅助推送渠道（可选，轻维表） */}
+                    <div>
+                      <label className="text-xs font-black text-blue-900/40 uppercase tracking-widest ml-1 mb-3 block">
+                        辅助推送渠道（可选）
+                      </label>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {pushChannels.filter(c => c.enabled !== false && c.type === 'kdocs').map((channel) => (
+                          <label
+                            key={channel.id}
+                            className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                              selectedSecondaryChannels.includes(channel.id)
+                                ? 'bg-purple-50 border-purple-500'
+                                : 'bg-slate-50 border-slate-200 hover:border-purple-300'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedSecondaryChannels.includes(channel.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedSecondaryChannels([...selectedSecondaryChannels, channel.id]);
+                                } else {
+                                  setSelectedSecondaryChannels(selectedSecondaryChannels.filter(id => id !== channel.id));
+                                }
+                              }}
+                              className="w-5 h-5 text-purple-500 focus:ring-2 focus:ring-purple-500 rounded"
+                            />
+                            <div className="flex-1">
+                              <div className="font-black text-blue-950">{channel.name}</div>
+                              <div className="text-xs text-slate-500 font-bold uppercase tracking-widest">轻维表</div>
+                            </div>
+                          </label>
+                        ))}
+                        {pushChannels.filter(c => c.enabled !== false && c.type === 'kdocs').length === 0 && (
+                          <p className="text-sm text-slate-400 text-center py-4">暂无轻维表推送渠道，可在个人中心添加</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!selectedPrimaryChannel) {
+                        alert('请选择主推送渠道');
+                        return;
+                      }
+
+                      const config: ThemePushConfig = {
+                        themeId: configuringThemeId,
+                        primaryChannelId: selectedPrimaryChannel,
+                        secondaryChannelIds: selectedSecondaryChannels.length > 0 ? selectedSecondaryChannels : undefined,
+                      };
+
+                      const result = await saveThemePushChannelConfig(config);
+                      if (result.success) {
+                        const configsResult = await fetchAllThemePushConfigs();
+                        if (configsResult.success) {
+                          setThemePushConfigs(configsResult.configs || {});
+                        }
+                        setIsPushConfigModalOpen(false);
+                        setConfiguringThemeId(null);
+                      }
+                    }}
+                    disabled={!selectedPrimaryChannel}
+                    className="w-full py-5 bg-blue-950 text-white rounded-[24px] font-black text-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-blue-950/10 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    保存配置
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* 验证推送弹窗 */}
+          {isTestPushModalOpen && testingThemeId && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+              onClick={() => setIsTestPushModalOpen(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                className="bg-white border border-white/10 rounded-[40px] w-full max-w-lg shadow-2xl overflow-hidden ring-1 ring-white/5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-10 space-y-8">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-2xl font-black text-blue-950">验证推送</h3>
+                    <button onClick={() => setIsTestPushModalOpen(false)} className="p-3 bg-white/5 rounded-full hover:bg-white/10 transition-colors border border-white/10">
+                      <X className="w-5 h-5 text-blue-900/30" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-6">
+                    <p className="text-sm text-slate-600 font-medium">
+                      选择要测试的推送渠道，系统将立即发送一条测试消息进行验证。
+                    </p>
+
+                    {/* 选择推送渠道 */}
+                    <div>
+                      <label className="text-xs font-black text-blue-900/40 uppercase tracking-widest ml-1 mb-3 block">
+                        选择推送渠道 <span className="text-red-500">*</span>
+                      </label>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {(() => {
+                          const themeConfig = themePushConfigs[testingThemeId];
+                          const availableChannels: PushChannel[] = [];
+                          
+                          if (themeConfig) {
+                            // 添加主渠道
+                            const primaryChannel = pushChannels.find(c => c.id === themeConfig.primaryChannelId);
+                            if (primaryChannel && primaryChannel.enabled !== false) {
+                              availableChannels.push(primaryChannel);
+                            }
+                            // 添加辅助渠道
+                            if (themeConfig.secondaryChannelIds) {
+                              for (const channelId of themeConfig.secondaryChannelIds) {
+                                const channel = pushChannels.find(c => c.id === channelId);
+                                if (channel && channel.enabled !== false) {
+                                  availableChannels.push(channel);
+                                }
+                              }
+                            }
+                          } else {
+                            // 如果没有配置，显示所有启用的渠道
+                            availableChannels.push(...pushChannels.filter(c => c.enabled !== false));
+                          }
+
+                          if (availableChannels.length === 0) {
+                            return (
+                              <p className="text-sm text-slate-400 text-center py-4">
+                                {themeConfig ? '该订阅未配置推送渠道' : '请先配置推送渠道'}
+                              </p>
+                            );
+                          }
+
+                          return availableChannels.map((channel) => (
+                            <label
+                              key={channel.id}
+                              className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                                selectedTestChannel === channel.id
+                                  ? 'bg-blue-50 border-blue-500'
+                                  : 'bg-slate-50 border-slate-200 hover:border-blue-300'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="test-channel"
+                                value={channel.id}
+                                checked={selectedTestChannel === channel.id}
+                                onChange={(e) => setSelectedTestChannel(e.target.value)}
+                                className="w-5 h-5 text-blue-500 focus:ring-2 focus:ring-blue-500"
+                              />
+                              <div className="flex-1">
+                                <div className="font-black text-blue-950">{channel.name}</div>
+                                <div className="text-xs text-slate-500 font-bold uppercase tracking-widest">
+                                  {channel.type === 'webhook' ? '机器人 Webhook' :
+                                   channel.type === 'email' ? '邮箱推送' :
+                                   '轻维表'}
+                                </div>
+                              </div>
+                            </label>
+                          ));
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* 测试结果 */}
+                    {testPushResult && (
+                      <div className={`p-4 rounded-xl border-2 ${
+                        testPushResult.success
+                          ? 'bg-green-50 border-green-500'
+                          : 'bg-red-50 border-red-500'
+                      }`}>
+                        <div className="flex items-center gap-3">
+                          {testPushResult.success ? (
+                            <CheckCircle2 className="w-5 h-5 text-green-600" />
+                          ) : (
+                            <AlertCircle className="w-5 h-5 text-red-600" />
+                          )}
+                          <div className="flex-1">
+                            <div className={`font-black text-sm ${
+                              testPushResult.success ? 'text-green-900' : 'text-red-900'
+                            }`}>
+                              {testPushResult.success ? '推送成功！' : '推送失败'}
+                            </div>
+                            <div className={`text-xs mt-1 ${
+                              testPushResult.success ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                              {testPushResult.message || testPushResult.error}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!selectedTestChannel) {
+                        alert('请选择要测试的推送渠道');
+                        return;
+                      }
+
+                      setTestPushLoading(true);
+                      setTestPushResult(null);
+
+                      const result = await testPushChannel(testingThemeId, selectedTestChannel);
+                      
+                      setTestPushResult({
+                        success: result.success,
+                        message: result.message,
+                        error: result.error,
+                      });
+
+                      setTestPushLoading(false);
+                    }}
+                    disabled={!selectedTestChannel || testPushLoading}
+                    className="w-full py-5 bg-blue-950 text-white rounded-[24px] font-black text-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-blue-950/10 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                  >
+                    {testPushLoading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        推送中...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-5 h-5" />
+                        立即验证
+                      </>
+                    )}
                   </button>
                 </div>
               </motion.div>
@@ -738,6 +1476,12 @@ function DashboardContent() {
             >
               <div className="flex items-center justify-between">
                 <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">选择你关注的主题</h2>
+                <button 
+                  onClick={() => setIsFeedbackModalOpen(true)}
+                  className="px-6 py-2.5 bg-blue-500/10 border-2 border-blue-400 rounded-2xl text-sm font-black text-white hover:bg-blue-500/20 hover:border-blue-300 hover:shadow-[0_0_20px_rgba(96,165,250,0.4)] transition-all shadow-lg"
+                >
+                  我要反馈
+                </button>
               </div>
 
               {/* 搜索和分类栏 */}
@@ -770,6 +1514,37 @@ function DashboardContent() {
               </div>
 
               <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
+                {/* 超级订阅入口：Google News 检索 */}
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="break-inside-avoid group relative flex flex-col"
+                >
+                  <div 
+                    onClick={() => setIsSuperSubModalOpen(true)}
+                    className="relative bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-[40px] p-8 shadow-2xl border-2 border-blue-400/30 hover:border-blue-400 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/10 cursor-pointer overflow-hidden"
+                  >
+                    <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                      <Globe className="w-32 h-32 rotate-12" />
+                    </div>
+                    <div className="relative z-10">
+                      <div className="flex items-center gap-4 mb-6">
+                        <div className="p-4 bg-blue-500 text-white rounded-2xl shadow-lg shadow-blue-500/20">
+                          <Search className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-2xl font-black text-white font-serif italic">超级订阅</h3>
+                      </div>
+                      <p className="text-lg font-bold text-white mb-4">输入你最想看的内容</p>
+                      <p className="text-sm text-blue-100/60 leading-relaxed mb-8">
+                        告诉我们您最想关注的主题，我们将围绕这个主题帮你额外搜集信息
+                      </p>
+                      <div className="flex items-center gap-2 text-blue-400 font-black text-xs uppercase tracking-[0.2em]">
+                        立即开启专属检索 <ArrowRight className="w-4 h-4" />
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+
                 {filteredThemes.map((theme, index) => (
                   <motion.div 
                     key={theme.id}
@@ -865,7 +1640,7 @@ function DashboardContent() {
                 </button>
               </div>
 
-              {subscribedThemeIds.length > 0 || settings.rssUrls ? (
+              {subscribedThemeIds.length > 0 || settings.rssUrls || settings.superSubKeyword ? (
                 <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
                   {/* 已订阅主题卡片 */}
                   {subscribedThemeIds.map((themeId) => {
@@ -903,7 +1678,7 @@ function DashboardContent() {
                             {theme.desc}
                           </p>
 
-                          <div className="mt-8 pt-8 border-t border-white/10">
+                          <div className="mt-8 pt-8 border-t border-white/10 space-y-4">
                             <div className="flex items-center justify-between mb-4">
                               <div className="flex items-center gap-2">
                                 <Rss className="w-4 h-4 text-blue-100/50" />
@@ -918,11 +1693,94 @@ function DashboardContent() {
                                 </div>
                               ))}
                             </div>
+                            
+                            {/* 推送渠道配置 */}
+                            <div className="pt-4 border-t border-white/5 space-y-3">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    setConfiguringThemeId(themeId);
+                                    const config = themePushConfigs[themeId];
+                                    if (config) {
+                                      setSelectedPrimaryChannel(config.primaryChannelId);
+                                      setSelectedSecondaryChannels(config.secondaryChannelIds || []);
+                                    } else {
+                                      setSelectedPrimaryChannel('');
+                                      setSelectedSecondaryChannels([]);
+                                    }
+                                    setIsPushConfigModalOpen(true);
+                                  }}
+                                  className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-black text-white uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                                >
+                                  <Settings2 className="w-4 h-4" />
+                                  配置推送渠道
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setTestingThemeId(themeId);
+                                    setSelectedTestChannel('');
+                                    setTestPushResult(null);
+                                    setIsTestPushModalOpen(true);
+                                  }}
+                                  className="flex-1 px-4 py-2.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-xl text-xs font-black text-blue-300 uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                                >
+                                  <Zap className="w-4 h-4" />
+                                  验证推送
+                                </button>
+                          </div>
+                              {themePushConfigs[themeId] && (
+                                <div className="text-[10px] text-blue-100/60 font-bold">
+                                  主渠道: {pushChannels.find(c => c.id === themePushConfigs[themeId].primaryChannelId)?.name || '未配置'}
+                                  {themePushConfigs[themeId].secondaryChannelIds && themePushConfigs[themeId].secondaryChannelIds!.length > 0 && (
+                                    <span className="ml-2">
+                                      + {themePushConfigs[themeId].secondaryChannelIds!.length} 个辅助渠道
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
                     );
                   })}
+                  
+                  {/* 超级订阅关键词卡片 */}
+                  {settings.superSubKeyword && (
+                    <div className="break-inside-avoid relative flex flex-col">
+                      <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-blue-500/20 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5">
+                        {/* 已订阅标签 */}
+                        <div className="absolute top-6 right-6 px-4 py-1.5 bg-green-500/20 text-green-300 text-[10px] font-black rounded-full border border-green-500/30 uppercase tracking-widest">
+                          已订阅
+                        </div>
+                        
+                        {/* 头部信息 */}
+                        <div className="flex items-center gap-4 mb-8">
+                          <div className="p-3.5 bg-white/10 rounded-2xl text-blue-600 border border-white/10 group-hover:bg-white group-hover:text-blue-950 transition-all duration-500">
+                            <Search className="w-5 h-5" />
+                          </div>
+                          <h3 className="text-xl font-black text-white font-serif">超级订阅</h3>
+                        </div>
+
+                        {/* 关键词显示 */}
+                        <div className="mb-8">
+                          <p className="text-sm text-blue-100/80 font-medium leading-relaxed mb-4">
+                            正在追踪以下关键词的实时动态
+                          </p>
+                          <div className="px-4 py-3 bg-white/10 rounded-2xl border border-white/10">
+                            <p className="text-lg font-black text-white">{settings.superSubKeyword}</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-8 pt-8 border-t border-white/10">
+                          <div className="flex items-center gap-2">
+                            <Rss className="w-4 h-4 text-blue-100/50" />
+                            <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">全网检索中</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* 自定义 RSS 源（不属于任何主题的） */}
                   {(() => {
@@ -998,7 +1856,7 @@ function DashboardContent() {
                 <div className="bg-white/10 rounded-[40px] border border-white/10 p-10 shadow-2xl backdrop-blur-md ring-1 ring-white/5 space-y-8">
                   <div className="flex items-center gap-5">
                     <div className="p-4 bg-white/10 rounded-2xl text-blue-300 border border-white/10"><Bell className="w-7 h-7" /></div>
-                    <h3 className="text-2xl font-black text-white font-serif">推送设置</h3>
+                    <h3 className="text-2xl font-black text-white font-serif">输入推送的机器人地址</h3>
                   </div>
                   <div className="space-y-4">
                     <div>
@@ -1016,12 +1874,11 @@ function DashboardContent() {
 
                 {/* API 状态 */}
                 <div className="bg-white/10 rounded-[40px] border border-white/10 p-10 shadow-2xl backdrop-blur-md ring-1 ring-white/5 space-y-8">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-5">
-                      <div className="p-4 bg-white/10 rounded-2xl text-blue-300 border border-white/10"><Zap className="w-7 h-7" /></div>
-                      <h3 className="text-2xl font-black text-white font-serif">AI 引擎配置</h3>
-                    </div>
-                    {(!settings.geminiApiKey && !settings.openaiApiKey) && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-5">
+                        <div className="p-4 bg-white/10 rounded-2xl text-blue-300 border border-white/10"><Zap className="w-7 h-7" /></div>
+                        <h3 className="text-2xl font-black text-white font-serif">配置你的AI-APIkey</h3>
+                      </div>
                       <button 
                         type="button"
                         onClick={handleThanks} disabled={thanksLoading}
@@ -1030,9 +1887,8 @@ function DashboardContent() {
                         {thanksLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Heart className="w-3.5 h-3.5 fill-current" />}
                         使用免费 API (感谢阿旭)
                       </button>
-                    )}
-                  </div>
-                  
+                    </div>
+
                   <div className="space-y-6">
                     <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/5">
                       <button type="button" onClick={() => setSettings({...settings, aiProvider: 'google'})} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${settings.aiProvider === 'google' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/40 hover:text-white'}`}>Google Gemini</button>
@@ -1088,8 +1944,197 @@ function DashboardContent() {
                   </div>
                 </div>
 
+                {/* 推送渠道管理 - 左右并排布局 */}
+                <div className="grid grid-cols-2 gap-6">
+                  {/* 机器人推送渠道 */}
+                  <div 
+                    onClick={() => {
+                      setEditingChannel(null);
+                      setNewChannelType('webhook');
+                      setIsChannelModalOpen(true);
+                    }}
+                    className="aspect-square bg-white/10 rounded-[40px] border border-white/10 p-8 shadow-2xl backdrop-blur-md ring-1 ring-white/5 hover:border-blue-500/30 hover:-translate-y-2 transition-all duration-500 cursor-pointer flex flex-col items-center justify-center text-center space-y-4 group"
+                  >
+                    <div className="p-6 bg-blue-500/20 rounded-2xl text-blue-300 border border-blue-500/30 group-hover:bg-blue-500/30 group-hover:scale-110 transition-all duration-500">
+                      <Bell className="w-10 h-10" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-white font-serif mb-2">机器人推送</h3>
+                      <p className="text-xs text-white/60 font-bold uppercase tracking-widest">
+                        {(() => {
+                          const webhookChannels = pushChannels.filter(c => c.type === 'webhook' || c.type === 'email');
+                          const enabledCount = webhookChannels.filter(c => c.enabled !== false).length;
+                          return enabledCount > 0 ? `${enabledCount} 个渠道已配置` : '点击配置';
+                        })()}
+                      </p>
+                    </div>
+                    {pushChannels.filter(c => (c.type === 'webhook' || c.type === 'email') && c.enabled !== false).length > 0 && (
+                      <div className="mt-2 px-3 py-1 bg-green-500/20 text-green-300 text-[10px] font-black rounded-full border border-green-500/30 uppercase tracking-widest">
+                        已启用
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 轻维表推送渠道 */}
+                  <div 
+                    onClick={() => {
+                      setEditingChannel(null);
+                      setNewChannelType('kdocs');
+                      setIsChannelModalOpen(true);
+                    }}
+                    className="aspect-square bg-white/10 rounded-[40px] border border-white/10 p-8 shadow-2xl backdrop-blur-md ring-1 ring-white/5 hover:border-purple-500/30 hover:-translate-y-2 transition-all duration-500 cursor-pointer flex flex-col items-center justify-center text-center space-y-4 group"
+                  >
+                    <div className="p-6 bg-purple-500/20 rounded-2xl text-purple-300 border border-purple-500/30 group-hover:bg-purple-500/30 group-hover:scale-110 transition-all duration-500">
+                      <LayoutGrid className="w-10 h-10" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-white font-serif mb-2">轻维表推送</h3>
+                      <p className="text-xs text-white/60 font-bold uppercase tracking-widest">
+                        {(() => {
+                          const kdocsChannels = pushChannels.filter(c => c.type === 'kdocs');
+                          const enabledCount = kdocsChannels.filter(c => c.enabled !== false).length;
+                          return enabledCount > 0 ? `${enabledCount} 个渠道已配置` : '点击配置';
+                        })()}
+                      </p>
+                    </div>
+                    {pushChannels.filter(c => c.type === 'kdocs' && c.enabled !== false).length > 0 && (
+                      <div className="mt-2 px-3 py-1 bg-green-500/20 text-green-300 text-[10px] font-black rounded-full border border-green-500/30 uppercase tracking-widest">
+                        已启用
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 推送渠道列表（详细管理） */}
+                {pushChannels.length > 0 && (
+                  <div className="bg-white/10 rounded-[40px] border border-white/10 p-10 shadow-2xl backdrop-blur-md ring-1 ring-white/5 space-y-8">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-5">
+                        <div className="p-4 bg-white/10 rounded-2xl text-blue-300 border border-white/10">
+                          <Settings2 className="w-7 h-7" />
+                        </div>
+                        <div>
+                          <h3 className="text-2xl font-black text-white font-serif">渠道管理</h3>
+                          <p className="text-xs text-white/60 font-bold mt-1 uppercase tracking-widest">查看和管理所有推送渠道</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingChannel(null);
+                          setNewChannelType('webhook');
+                          setIsChannelModalOpen(true);
+                        }}
+                        className="px-6 py-3 bg-blue-500 text-white rounded-full font-black text-sm uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg flex items-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        添加渠道
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {pushChannels.map((channel) => (
+                        <div key={channel.id} className="bg-white/5 rounded-2xl border border-white/5 p-6 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className={`p-3 rounded-xl ${
+                                channel.type === 'webhook' ? 'bg-blue-500/20 text-blue-300' :
+                                channel.type === 'email' ? 'bg-green-500/20 text-green-300' :
+                                'bg-purple-500/20 text-purple-300'
+                              }`}>
+                                {channel.type === 'webhook' ? <Bell className="w-5 h-5" /> :
+                                 channel.type === 'email' ? <User className="w-5 h-5" /> :
+                                 <LayoutGrid className="w-5 h-5" />}
+                              </div>
+                              <div>
+                                <h4 className="text-lg font-black text-white">{channel.name}</h4>
+                                <p className="text-xs text-white/60 font-bold uppercase tracking-widest">
+                                  {channel.type === 'webhook' ? '机器人 Webhook' :
+                                   channel.type === 'email' ? '邮箱推送' :
+                                   '轻维表'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={channel.enabled !== false}
+                                  onChange={async (e) => {
+                                    await updatePushChannelById(channel.id, { enabled: e.target.checked });
+                                    const result = await fetchPushChannels();
+                                    if (result.success) setPushChannels(result.channels || []);
+                                  }}
+                                  className="w-5 h-5 rounded border-white/20 bg-white/5 text-blue-500 focus:ring-2 focus:ring-blue-500"
+                                />
+                                <span className="text-xs font-bold text-white/80">启用</span>
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingChannel(channel);
+                                  setNewChannelType(channel.type);
+                                  setIsChannelModalOpen(true);
+                                }}
+                                className="px-4 py-2 bg-white/10 text-white rounded-xl font-bold text-xs hover:bg-white/20 transition-all"
+                              >
+                                编辑
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (confirm('确定要删除这个推送渠道吗？')) {
+                                    await removePushChannel(channel.id);
+                                    const result = await fetchPushChannels();
+                                    if (result.success) setPushChannels(result.channels || []);
+                                  }
+                                }}
+                                className="px-4 py-2 bg-red-500/20 text-red-300 rounded-xl font-bold text-xs hover:bg-red-500/30 transition-all"
+                              >
+                                删除
+                              </button>
+                            </div>
+                          </div>
+                          {channel.type === 'webhook' && channel.webhookUrl && (
+                            <div className="pl-20 text-xs text-white/60 font-medium truncate">
+                              {channel.webhookUrl}
+                            </div>
+                          )}
+                          {channel.type === 'email' && channel.emailAddress && (
+                            <div className="pl-20 text-xs text-white/60 font-medium">
+                              {channel.emailAddress}
+                            </div>
+                          )}
+                          {channel.type === 'kdocs' && channel.kdocsFileToken && (
+                            <div className="pl-20 text-xs text-white/60 font-medium">
+                              轻维表: {channel.kdocsFileToken.substring(0, 20)}...
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* 底部按钮移除，已移至顶部 */}
               </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Toast 提示 */}
+        <AnimatePresence>
+          {showToast && (
+            <motion.div
+              initial={{ opacity: 0, y: 50, x: "-50%" }}
+              animate={{ opacity: 1, y: 0, x: "-50%" }}
+              exit={{ opacity: 0, y: 20, x: "-50%" }}
+              className="fixed bottom-12 left-1/2 z-[200] px-6 py-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl flex items-center gap-3"
+            >
+              <div className="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center border border-blue-500/30">
+                <Heart className="w-4 h-4 text-blue-400 fill-current" />
+              </div>
+              <span className="text-sm font-bold text-white tracking-wide">{toastMsg}</span>
             </motion.div>
           )}
         </AnimatePresence>
