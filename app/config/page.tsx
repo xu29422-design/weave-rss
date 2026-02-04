@@ -57,16 +57,6 @@ const HELP_CONTENT: Record<ConfigModule, HelpContent> = {
       { t: "汇总阶段", d: "控制 AI 如何将多条新闻组合成易读的日报段落。" },
       { t: "今日焦点", d: "控制 AI 如何撰写每日最核心的 100 字精华摘要。" }
     ]
-  },
-  kdocs: {
-    title: "轻维表推送配置",
-    desc: "将简报数据同步到金山文档轻维表，方便后续查阅和分析。",
-    color: "from-green-600 to-emerald-600",
-    steps: [
-      { t: "获取凭证", d: "在金山文档开放平台注册应用，获取 App ID 和 App Secret。" },
-      { t: "创建轻维表", d: "在金山文档中创建轻维表，获取 File Token 和 DBSheet ID。" },
-      { t: "配置字段", d: "确保轻维表包含必要的字段：日期、今日焦点、分类数量等。" }
-    ]
   }
 };
 
