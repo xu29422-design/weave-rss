@@ -1,4 +1,5 @@
 import { createClient } from "@vercel/kv";
+import crypto from "crypto";
 
 export interface Settings {
   aiProvider: 'google' | 'openai';
@@ -191,6 +192,10 @@ function getUserRawRSSClearKey(userId: string): string {
   return `user:${userId}:rss_raw_last_clear`;
 }
 
+function getUserRawRSSSeenPrefix(userId: string, version: number): string {
+  return `user:${userId}:rss_raw_seen:${version}:`;
+}
+
 const RAW_RSS_TTL_SECONDS = 26 * 60 * 60;
 const RAW_RSS_MAX_ITEMS = 1000;
 
@@ -245,14 +250,37 @@ export async function saveRawRSSItems(userId: string, items: RawRSSItemStored[])
   const clearKey = getUserRawRSSClearKey(userId);
   const now = Date.now();
 
-  const lastClear = await globalKv.get<number>(clearKey);
+  let lastClear = await globalKv.get<number>(clearKey);
   if (!lastClear || now - lastClear > RAW_RSS_TTL_SECONDS * 1000) {
     await globalKv.del(rawKey);
-    await globalKv.set(clearKey, now);
+    lastClear = now;
+    await globalKv.set(clearKey, lastClear);
   }
 
-  const pipeline = globalKv.pipeline();
+  const seenPrefix = getUserRawRSSSeenPrefix(userId, lastClear);
+  const seenPipeline = globalKv.pipeline();
+  const candidates: RawRSSItemStored[] = [];
+
   items.forEach((item) => {
+    const hashSource = item.link || item.title || JSON.stringify(item);
+    const hash = crypto.createHash("md5").update(hashSource).digest("hex");
+    seenPipeline.set(`${seenPrefix}${hash}`, "1", {
+      nx: true,
+      ex: RAW_RSS_TTL_SECONDS,
+    });
+    candidates.push(item);
+  });
+
+  const seenResults = await seenPipeline.exec();
+  const newItems = candidates.filter((_, idx) => {
+    const result = seenResults[idx];
+    return result === "OK" || result === 1;
+  });
+
+  if (newItems.length === 0) return;
+
+  const pipeline = globalKv.pipeline();
+  newItems.forEach((item) => {
     pipeline.lpush(rawKey, JSON.stringify(item));
   });
   pipeline.ltrim(rawKey, 0, RAW_RSS_MAX_ITEMS - 1);

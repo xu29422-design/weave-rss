@@ -163,6 +163,15 @@ export async function fetchNewItems(userId: string, urls: string[], superSubKeyw
   // 第一层去重：标题语义去重（快速，在内存中完成）
   const titleDedupedItems = deduplicateByTitle(recentItems, 0.75);
 
+  // 保存原始 RSS 条目（26 小时窗口，独立去重）
+  await saveRawRSSItems(
+    userId,
+    titleDedupedItems.map((item) => ({
+      ...item,
+      fetchedAt: new Date().toISOString(),
+    }))
+  );
+
   // 第二层去重：URL 去重（使用 Pipeline 批量查询优化性能）
   console.log(`开始 URL 去重检查...`);
   const newItems: RawRSSItem[] = [];
@@ -190,14 +199,5 @@ export async function fetchNewItems(userId: string, urls: string[], superSubKeyw
   }
 
   console.log(`✅ 最终结果: ${newItems.length} 篇新文章（已排除重复主题和重复 URL）`);
-
-  // 保存原始 RSS 条目（26 小时窗口）
-  await saveRawRSSItems(
-    userId,
-    newItems.map((item) => ({
-      ...item,
-      fetchedAt: new Date().toISOString(),
-    }))
-  );
   return newItems;
 }

@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
-import { getRSSSources, getSettings } from "@/lib/redis";
+import { getRSSSources, getSettings, getRawRSSItems } from "@/lib/redis";
 import { fetchNewItems } from "@/lib/rss-utils";
 
 /**
@@ -43,12 +43,14 @@ export async function POST(request: NextRequest) {
     }
 
     const items = await fetchNewItems(userId, rssSources, settings.superSubKeyword);
+    const rawItems = await getRawRSSItems(userId, 3);
 
     return NextResponse.json({
       success: true,
       data: {
         totalItems: items.length,
-        sample: items.slice(0, 3),
+        rawCount: rawItems.length,
+        sample: rawItems,
       },
     });
   } catch (error: any) {
