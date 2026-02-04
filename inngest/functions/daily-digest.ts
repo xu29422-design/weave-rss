@@ -266,7 +266,7 @@ export const digestWorker = inngest.createFunction(
       }
 
       // 推送到所有收集到的渠道
-      for (const [channelId, { channel, isPrimary }] of channelsToPush) {
+      for (const [channelId, { channel, isPrimary }] of Array.from(channelsToPush.entries())) {
         try {
           if (channel.type === 'webhook' && channel.webhookUrl) {
             // 推送到 Webhook
