@@ -381,7 +381,7 @@ export const digestWorker = inngest.createFunction(
                     '来源': item.link || '',
                     '分类': item.category || '未分类',
                     '质量分数': item.score || 0,
-                    '发布时间': item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
+                    '发布时间': new Date().toISOString(),
                     '导入时间': new Date().toISOString(),
                   }
                 );
