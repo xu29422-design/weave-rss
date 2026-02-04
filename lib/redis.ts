@@ -224,6 +224,16 @@ export interface PushLog {
   timestamp: string;
   status: 'success' | 'failed';
   error?: string;
+  digestData?: {
+    highQualityItems: Array<{
+      title?: string;
+      summary?: string;
+      link?: string;
+      category?: string;
+      score?: number;
+    }>;
+  };
+  reportContent?: string;
   details?: {
     themeCount: number;
     sourceCount: number;

@@ -466,6 +466,16 @@ export const digestWorker = inngest.createFunction(
       await savePushLog(userId, {
         status: hasSuccess ? 'success' : 'failed',
         error: hasFailure ? JSON.stringify(pushResults) : undefined,
+        digestData: {
+          highQualityItems: highQualityItems.map((item) => ({
+            title: item.title,
+            summary: item.summary,
+            link: item.link,
+            category: item.category,
+            score: item.score,
+          })),
+        },
+        reportContent,
         details: {
           themeCount: settings.subscribedThemes?.length || 0,
           sourceCount: rssSources.length,
