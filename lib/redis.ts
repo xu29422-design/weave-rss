@@ -183,6 +183,26 @@ function getUserRSSKey(userId: string): string {
   return `user:${userId}:rss_sources`;
 }
 
+function getUserRawRSSKey(userId: string): string {
+  return `user:${userId}:rss_raw`;
+}
+
+function getUserRawRSSClearKey(userId: string): string {
+  return `user:${userId}:rss_raw_last_clear`;
+}
+
+const RAW_RSS_TTL_SECONDS = 26 * 60 * 60;
+const RAW_RSS_MAX_ITEMS = 1000;
+
+export interface RawRSSItemStored {
+  title: string;
+  link: string;
+  contentSnippet: string;
+  pubDate: string;
+  sourceName: string;
+  fetchedAt: string;
+}
+
 /**
  * 获取用户配置（带用户隔离）
  */
@@ -214,6 +234,41 @@ export async function getRSSSources(userId: string): Promise<string[]> {
 export async function saveRSSSources(userId: string, sources: string[]) {
   if (!globalKv) throw new Error("KV 客户端未初始化");
   await globalKv.set(getUserRSSKey(userId), sources);
+}
+
+/**
+ * 保存原始 RSS 条目（26 小时窗口，去重由抓取逻辑保障）
+ */
+export async function saveRawRSSItems(userId: string, items: RawRSSItemStored[]) {
+  if (!globalKv || items.length === 0) return;
+  const rawKey = getUserRawRSSKey(userId);
+  const clearKey = getUserRawRSSClearKey(userId);
+  const now = Date.now();
+
+  const lastClear = await globalKv.get<number>(clearKey);
+  if (!lastClear || now - lastClear > RAW_RSS_TTL_SECONDS * 1000) {
+    await globalKv.del(rawKey);
+    await globalKv.set(clearKey, now);
+  }
+
+  const pipeline = globalKv.pipeline();
+  items.forEach((item) => {
+    pipeline.lpush(rawKey, JSON.stringify(item));
+  });
+  pipeline.ltrim(rawKey, 0, RAW_RSS_MAX_ITEMS - 1);
+  pipeline.expire(rawKey, RAW_RSS_TTL_SECONDS);
+  await pipeline.exec();
+}
+
+/**
+ * 获取原始 RSS 条目（按最新优先）
+ */
+export async function getRawRSSItems(userId: string, limit = 200): Promise<RawRSSItemStored[]> {
+  if (!globalKv) return [];
+  const rawKey = getUserRawRSSKey(userId);
+  const cappedLimit = Math.max(1, Math.min(limit, RAW_RSS_MAX_ITEMS));
+  const logs = await globalKv.lrange<string>(rawKey, 0, cappedLimit - 1);
+  return logs.map((l) => JSON.parse(l));
 }
 
 /**

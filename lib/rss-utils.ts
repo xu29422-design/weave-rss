@@ -1,5 +1,6 @@
 import Parser from "rss-parser";
 import { kv } from "@vercel/kv";
+import { saveRawRSSItems } from "@/lib/redis";
 import { subDays, isAfter } from "date-fns";
 import crypto from "crypto";
 
@@ -189,5 +190,14 @@ export async function fetchNewItems(userId: string, urls: string[], superSubKeyw
   }
 
   console.log(`✅ 最终结果: ${newItems.length} 篇新文章（已排除重复主题和重复 URL）`);
+
+  // 保存原始 RSS 条目（26 小时窗口）
+  await saveRawRSSItems(
+    userId,
+    newItems.map((item) => ({
+      ...item,
+      fetchedAt: new Date().toISOString(),
+    }))
+  );
   return newItems;
 }
