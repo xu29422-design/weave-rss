@@ -4,7 +4,7 @@ import { fetchNewItems } from "@/lib/rss-utils";
 import { analyzeItem, writeCategorySection, generateTLDR, shortenContent, filterTopItems } from "@/lib/ai-service";
 import { getAllActiveUsers } from "@/lib/auth";
 import { pushDigestToKdocs, getFirstDBSheetId } from "@/lib/kdocs-api";
-import { pushDigestToWPSDBSheet } from "@/lib/wps-dbsheet-api";
+import { createWPSDBSheetRecord } from "@/lib/wps-dbsheet-api";
 
 const CATEGORY_MAP: Record<string, string> = {
   'Product': '📱 竞品动态',
@@ -369,20 +369,25 @@ export const digestWorker = inngest.createFunction(
             const wpsResults = [];
             for (const item of highQualityItems) {
               try {
-                const wpsResult = await pushDigestToWPSDBSheet(
+                const wpsResult = await createWPSDBSheetRecord(
                   channel.wpsAppId,
                   channel.wpsAppSecret,
                   channel.wpsFileToken,
                   channel.wpsTableId,
-                  item.title || '无标题',
-                  item.content || item.description || '',
-                  item.summary || tldr || '',
-                  item.link || '',
-                  item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString()
+                  {
+                    '标题': item.title || '无标题',
+                    '内容': item.content || item.description || '',
+                    '摘要': item.summary || tldr || '',
+                    '来源': item.link || '',
+                    '分类': item.category || '未分类',
+                    '质量分数': item.quality || 0,
+                    '发布时间': item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
+                    '导入时间': new Date().toISOString(),
+                  }
                 );
 
                 if (wpsResult.success) {
-                  wpsResults.push({ success: true, record_id: wpsResult.record_id });
+                  wpsResults.push({ success: true, recordId: wpsResult.recordId });
                 } else {
                   wpsResults.push({ success: false, error: wpsResult.error });
                 }
