@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 获取指定天数的推送日志
-    const logs = await kv.lrange(`user:${userId}:pushLogs`, 0, days - 1);
+    const logs = await kv.lrange(`user:${userId}:push_logs`, 0, days - 1);
     
     if (!logs || logs.length === 0) {
       return NextResponse.json({
@@ -55,7 +55,9 @@ export async function GET(request: NextRequest) {
     }
 
     // 解析最新的日志数据
-    const latestLog: any = logs[0];
+    const latestLogRaw: any = logs[0];
+    const latestLog: any =
+      typeof latestLogRaw === "string" ? JSON.parse(latestLogRaw) : latestLogRaw;
     
     if (!latestLog) {
       return NextResponse.json({
