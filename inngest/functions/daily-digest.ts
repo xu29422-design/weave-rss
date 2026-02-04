@@ -376,11 +376,11 @@ export const digestWorker = inngest.createFunction(
                   channel.wpsTableId,
                   {
                     '标题': item.title || '无标题',
-                    '内容': item.content || item.description || '',
+                    '内容': item.summary || '',
                     '摘要': item.summary || tldr || '',
                     '来源': item.link || '',
                     '分类': item.category || '未分类',
-                    '质量分数': item.quality || 0,
+                    '质量分数': item.score || 0,
                     '发布时间': item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
                     '导入时间': new Date().toISOString(),
                   }
