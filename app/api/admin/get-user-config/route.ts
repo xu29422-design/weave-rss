@@ -1,7 +1,7 @@
 "use server";
 
 import { NextRequest, NextResponse } from "next/server";
-import { createKVClient } from "@/lib/redis";
+import { createKVClient, getRSSSources } from "@/lib/redis";
 import { kv } from "@vercel/kv";
 
 /**
@@ -43,10 +43,12 @@ export async function POST(request: NextRequest) {
     }
 
     const settings = await kvClient.get<any>(`user:${userId}:settings`);
+    const rssSources = await getRSSSources(userId);
 
     return NextResponse.json({
       success: true,
       userId,
+      rssSources,
       settings: settings ? {
         ...settings,
         kdocsAppSecret: settings.kdocsAppSecret ? settings.kdocsAppSecret.substring(0, 8) + '...' : undefined,
