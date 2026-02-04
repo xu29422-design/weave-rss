@@ -25,7 +25,7 @@ export interface Settings {
 /**
  * 推送渠道类型
  */
-export type PushChannelType = 'webhook' | 'email' | 'kdocs';
+export type PushChannelType = 'webhook' | 'email' | 'kdocs' | 'wps-dbsheet';
 
 /**
  * 推送渠道配置
@@ -43,6 +43,11 @@ export interface PushChannel {
   kdocsAppSecret?: string; // 金山文档 App Secret
   kdocsFileToken?: string; // 轻维表文件 token
   kdocsDBSheetId?: string; // 轻维表数据表 ID
+  // WPS 多维表格配置
+  wpsAppId?: string; // WPS 应用 ID（当 type 为 'wps-dbsheet' 时）
+  wpsAppSecret?: string; // WPS 应用密钥
+  wpsFileToken?: string; // WPS 多维表文件 token
+  wpsTableId?: string; // WPS 多维表数据表 ID
   // 通用配置
   enabled?: boolean; // 是否启用
   createdAt?: string; // 创建时间

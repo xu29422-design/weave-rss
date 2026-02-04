@@ -4,6 +4,7 @@ import { fetchNewItems } from "@/lib/rss-utils";
 import { analyzeItem, writeCategorySection, generateTLDR, shortenContent, filterTopItems } from "@/lib/ai-service";
 import { getAllActiveUsers } from "@/lib/auth";
 import { pushDigestToKdocs, getFirstDBSheetId } from "@/lib/kdocs-api";
+import { pushDigestToWPSDBSheet } from "@/lib/wps-dbsheet-api";
 
 const CATEGORY_MAP: Record<string, string> = {
   'Product': '📱 竞品动态',
@@ -369,6 +370,64 @@ export const digestWorker = inngest.createFunction(
             } else {
               console.error(`❌ 推送到轻维表 ${channel.name} 失败:`, kdocsResult.error);
               pushResults.channels[channelId] = { success: false, type: 'kdocs', name: channel.name, error: kdocsResult.error };
+            }
+          } else if (channel.type === 'wps-dbsheet') {
+            // 推送到 WPS 多维表格
+            console.log(`=== 推送到 WPS 多维表格 ${channel.name} (${isPrimary ? '主渠道' : '辅助渠道'}) ===`);
+            
+            if (!channel.wpsAppId || !channel.wpsAppSecret || !channel.wpsFileToken || !channel.wpsTableId) {
+              console.error(`❌ WPS 多维表格 ${channel.name} 配置不完整`);
+              pushResults.channels[channelId] = { success: false, type: 'wps-dbsheet', name: channel.name, error: '配置不完整' };
+              continue;
+            }
+
+            // 将简报内容推送到 WPS 多维表格
+            // 每条高质量内容作为一条记录
+            const wpsResults = [];
+            for (const item of highQualityItems) {
+              try {
+                const wpsResult = await pushDigestToWPSDBSheet(
+                  channel.wpsAppId,
+                  channel.wpsAppSecret,
+                  channel.wpsFileToken,
+                  channel.wpsTableId,
+                  item.title || '无标题',
+                  item.content || item.description || '',
+                  item.summary || tldr || '',
+                  item.link || '',
+                  item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString()
+                );
+
+                if (wpsResult.success) {
+                  wpsResults.push({ success: true, record_id: wpsResult.record_id });
+                } else {
+                  wpsResults.push({ success: false, error: wpsResult.error });
+                }
+              } catch (error: any) {
+                console.error(`❌ 推送单条记录到 WPS 多维表格失败:`, error);
+                wpsResults.push({ success: false, error: error.message });
+              }
+            }
+
+            const successCount = wpsResults.filter(r => r.success).length;
+            if (successCount > 0) {
+              console.log(`✅ 推送到 WPS 多维表格 ${channel.name} 成功！成功 ${successCount}/${highQualityItems.length} 条记录`);
+              pushResults.channels[channelId] = { 
+                success: true, 
+                type: 'wps-dbsheet', 
+                name: channel.name, 
+                successCount,
+                totalCount: highQualityItems.length
+              };
+            } else {
+              console.error(`❌ 推送到 WPS 多维表格 ${channel.name} 失败: 所有记录推送失败`);
+              pushResults.channels[channelId] = { 
+                success: false, 
+                type: 'wps-dbsheet', 
+                name: channel.name, 
+                error: '所有记录推送失败',
+                results: wpsResults
+              };
             }
           }
         } catch (error: any) {
