@@ -263,23 +263,6 @@ export const digestWorker = inngest.createFunction(
             isPrimary: true,
           });
         }
-
-        // 使用旧的全局轻维表配置
-        if (settings!.enableKdocsPush && settings!.kdocsAppId && settings!.kdocsAppSecret && settings!.kdocsFileToken) {
-          channelsToPush.set('legacy-kdocs', {
-            channel: {
-              id: 'legacy-kdocs',
-              type: 'kdocs',
-              name: '默认轻维表',
-              kdocsAppId: settings!.kdocsAppId,
-              kdocsAppSecret: settings!.kdocsAppSecret,
-              kdocsFileToken: settings!.kdocsFileToken,
-              kdocsDBSheetId: settings!.kdocsDBSheetId,
-              enabled: true,
-            } as PushChannel,
-            isPrimary: false,
-          });
-        }
       }
 
       // 推送到所有收集到的渠道
