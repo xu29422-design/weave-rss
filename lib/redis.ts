@@ -296,7 +296,9 @@ export async function getRawRSSItems(userId: string, limit = 200): Promise<RawRS
   const rawKey = getUserRawRSSKey(userId);
   const cappedLimit = Math.max(1, Math.min(limit, RAW_RSS_MAX_ITEMS));
   const logs = await globalKv.lrange<string>(rawKey, 0, cappedLimit - 1);
-  return logs.map((l) => JSON.parse(l));
+  return logs
+    .map((l) => (typeof l === "string" ? JSON.parse(l) : (l as any)))
+    .filter(Boolean);
 }
 
 /**
