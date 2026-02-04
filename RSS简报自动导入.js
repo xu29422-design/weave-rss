@@ -14,7 +14,7 @@ var SHEET_NAME = 'sheet1'; // 目标多维表（大小写不敏感）
 function main() {
   log('========================================');
   log('RSS 简报自动导入');
-  log('时间: ' + formatDate(new Date()));
+  log('时间: ' + formatDateTime(new Date()));
   log('========================================');
   log('');
   
