@@ -13,7 +13,7 @@ import {
 import { RssIcon } from "@/components/AnimatedIcons";
 import { motion } from "framer-motion";
 
-type ConfigModule = 'basic' | 'rss' | 'prompts' | 'kdocs';
+type ConfigModule = 'basic' | 'rss' | 'prompts';
 
 interface HelpStep {
   t: string;
@@ -211,11 +211,6 @@ export default function ConfigWizard() {
     pushDays: [1, 2, 3, 4, 5] as number[],
     rssUrls: "",
     // 轻维表配置
-    kdocsAppId: "",
-    kdocsAppSecret: "",
-    kdocsFileToken: "",
-    kdocsDBSheetId: "",
-    enableKdocsPush: false,
     analystPrompt: `你是一位专业的科技情报分析师。请对提供的单条新闻条目进行分析并分类。
 要求：
 1. 提炼核心内容，控制在 100 字以内。
@@ -280,12 +275,6 @@ export default function ConfigWizard() {
             analystPrompt: configData.settings?.analystPrompt || "",
             editorPrompt: configData.settings?.editorPrompt || "",
             tldrPrompt: configData.settings?.tldrPrompt || "",
-            // 轻维表配置
-            kdocsAppId: configData.settings?.kdocsAppId || "",
-            kdocsAppSecret: configData.settings?.kdocsAppSecret || "",
-            kdocsFileToken: configData.settings?.kdocsFileToken || "",
-            kdocsDBSheetId: configData.settings?.kdocsDBSheetId || "",
-            enableKdocsPush: configData.settings?.enableKdocsPush || false,
           };
           setFormState(newState);
           if (configData.settings?.aiProvider) setAiProvider(configData.settings.aiProvider);
@@ -297,7 +286,6 @@ export default function ConfigWizard() {
           if (configData.rssSources?.length > 0) initialResults.rss = { status: 'success', message: '已保存' };
           initialResults.prompts = { status: 'success', message: '已保存' };
           initialResults.basic = { status: 'success', message: '已保存' };
-          if (configData.settings?.enableKdocsPush && configData.settings?.kdocsFileToken) initialResults.kdocs = { status: 'success', message: '已保存' };
           setResults(initialResults);
         }
       } catch (error) {
@@ -355,7 +343,7 @@ export default function ConfigWizard() {
 
         if (module === 'basic') setActiveModule('rss');
         else if (module === 'rss') setActiveModule('prompts');
-        else if (module === 'prompts') setActiveModule('kdocs');
+        else if (module === 'prompts') setActiveModule(null);
       }
     } catch (e) {
       setResults(prev => ({ ...prev, [module]: { status: 'error', message: '校验或保存失败' } }));
