@@ -227,6 +227,8 @@ export interface PushLog {
   details?: {
     themeCount: number;
     sourceCount: number;
+    channelCount?: number;
+    successCount?: number;
   };
 }
 
