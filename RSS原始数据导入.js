@@ -5,8 +5,8 @@
 // ========================================
 
 var API_URL = 'https://www.weaverss.online';
-var USER_ID = '1159370261@qq.com';
-var API_KEY = 'wps_1770173096274_b4pz5s';
+var USER_ID = 'user_1769675261811_pu3kt';
+var API_KEY = 'wps_1770192877815_hdwfqa';
 var TABLE_NAME = 'Sheet1'; // 原始数据表
 var LIMIT = 200; // 每次拉取数量
 
@@ -94,12 +94,13 @@ function importData(sheet, items) {
   var skip = 0;
   var error = 0;
 
-  var records = sheet.Records;
+  var records = sheet.Records || [];
   log('表格现有 ' + records.length + ' 条记录');
   log('');
 
-  for (var i = 0; i < items.length; i++) {
-    var item = items[i];
+  var safeItems = items || [];
+  for (var i = 0; i < safeItems.length; i++) {
+    var item = safeItems[i];
 
     if (isDuplicate(records, item.link, item.title)) {
       skip = skip + 1;
@@ -108,7 +109,7 @@ function importData(sheet, items) {
     }
 
     try {
-      sheet.AddRecord({
+      addRecord(sheet, {
         '标题': item.title || '',
         '内容': item.contentSnippet || '',
         '来源': item.link || '',
@@ -152,6 +153,19 @@ function padZero(num) {
 
 function log(msg) {
   console.log(msg);
+}
+
+function addRecord(sheet, record) {
+  if (sheet && typeof sheet.AddRecord === 'function') {
+    return sheet.AddRecord(record);
+  }
+  if (sheet && sheet.Records && typeof sheet.Records.Add === 'function') {
+    return sheet.Records.Add(record);
+  }
+  if (Application && Application.ActiveSheet && typeof Application.ActiveSheet.AddRecord === 'function') {
+    return Application.ActiveSheet.AddRecord(record);
+  }
+  throw new Error('当前表对象不支持 AddRecord');
 }
 
 main();

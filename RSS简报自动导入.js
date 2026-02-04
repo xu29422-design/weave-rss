@@ -6,9 +6,9 @@
 
 // 配置信息
 var API_URL = 'https://www.weaverss.online';
-var USER_ID = '1159370261@qq.com';
-var API_KEY = 'wps_1770173096274_b4pz5s';
-var TABLE_NAME = 'Sheet1';
+var USER_ID = 'user_1769675261811_pu3kt';
+var API_KEY = 'wps_1770192877815_hdwfqa';
+var SHEET_NAME = 'sheet1'; // 目标多维表（大小写不敏感）
 
 // 主函数
 function main() {
@@ -24,7 +24,8 @@ function main() {
   if (!sheet) {
     return;
   }
-  log('OK - 表格: ' + TABLE_NAME);
+  log('OK - 表格: ' + sheet.Name);
+  log('SheetId: ' + sheet.Id);
   log('');
   
   // 第2步: 获取数据
@@ -63,10 +64,14 @@ function main() {
 // 获取表格
 function getSheet() {
   try {
-    var sheet = Application.Sheets(TABLE_NAME);
+    var sheet = Application.ActiveSheet || null;
+    if (sheet && String(sheet.Name).toLowerCase() !== String(SHEET_NAME).toLowerCase()) {
+      log('请先切换到表: ' + SHEET_NAME + ' 再运行');
+      log('当前表: ' + sheet.Name);
+      return null;
+    }
     if (!sheet) {
-      log('错误: 未找到表格 "' + TABLE_NAME + '"');
-      log('请修改脚本第10行的 TABLE_NAME');
+      log('未获取到多维表');
       return null;
     }
     return sheet;
@@ -122,79 +127,58 @@ function importData(sheet, items) {
   var success = 0;
   var skip = 0;
   var error = 0;
-  
-  var records = sheet.Records;
-  log('表格现有 ' + records.length + ' 条记录');
-  log('');
-  
-  for (var i = 0; i < items.length; i++) {
-    var item = items[i];
-    
-    // 检查重复
-    if (isDuplicate(records, item.title)) {
-      skip = skip + 1;
-      log('- 跳过: ' + item.title);
-      continue;
-    }
-    
-    // 添加记录
-    try {
-      sheet.AddRecord({
+  var safeItems = items || [];
+
+  if (safeItems.length === 0) {
+    return { success: 0, skip: 0, error: 0 };
+  }
+
+  var records = [];
+  for (var i = 0; i < safeItems.length; i++) {
+    var item = safeItems[i];
+    records.push({
+      fields: {
         '标题': item.title || '',
         '内容': item.content || '',
         '摘要': item.summary || '',
         '来源': item.source || '',
         '分类': item.category || '未分类',
         '质量分数': item.quality || 0,
-        '发布时间': new Date(item.publishTime),
-        '导入时间': new Date()
-      });
-      success = success + 1;
-      log('+ 成功: ' + item.title);
-    } catch (e) {
-      error = error + 1;
-      log('x 失败: ' + item.title);
-      log('  原因: ' + e);
-    }
+        '发布时间': formatDateTime(item.publishTime),
+        '导入时间': formatDateTime(new Date().toISOString())
+      }
+    });
   }
-  
-  return {
-    success: success,
-    skip: skip,
-    error: error
-  };
+
+  try {
+    Application.Record.CreateRecords({
+      SheetId: sheet.Id,
+      Records: records
+    });
+    success = records.length;
+  } catch (e) {
+    error = records.length;
+    log('写入失败: ' + e);
+  }
+
+  return { success: success, skip: skip, error: error };
 }
 
 // 检查是否重复
-function isDuplicate(records, title) {
-  for (var i = 0; i < records.length; i++) {
-    if (records[i]['标题'] === title) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// 格式化日期
-function formatDate(date) {
-  var year = date.getFullYear();
-  var month = padZero(date.getMonth() + 1);
-  var day = padZero(date.getDate());
-  var hour = padZero(date.getHours());
-  var minute = padZero(date.getMinutes());
-  var second = padZero(date.getSeconds());
-  return year + '-' + month + '-' + day + ' ' + hour + ':' + minute + ':' + second;
-}
-
-// 补零
-function padZero(num) {
-  return num < 10 ? '0' + num : '' + num;
-}
-
 // 日志输出
 function log(msg) {
   console.log(msg);
 }
+
+function formatDateTime(input) {
+  if (!input) return '';
+  var d = new Date(input);
+  if (isNaN(d.getTime())) return '';
+  return pad(d.getFullYear()) + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+         ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}
+
+function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
 // 执行主函数
 main();
