@@ -571,7 +571,59 @@ function DashboardContent() {
   };
 
   const handleConfirmSubscription = async () => {
-    // ... existing subscription logic ...
+    if (!selectedTheme) return;
+
+    // 检查 webhook 地址
+    const webhookUrl = modalConfig.webhookUrl || settings.webhookUrl;
+    if (!webhookUrl) {
+      alert("请输入 Webhook 地址");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // 1. 收集该主题的 RSS 源（主题自带 + 用户自定义）
+      const themeSources = selectedTheme.sources || [];
+      const customSources = customThemeSources[selectedTheme.id] || [];
+      const allThemeSources = [...themeSources, ...customSources];
+
+      // 2. 合并到用户 RSS 列表（去重）
+      const currentSources = settings.rssUrls ? settings.rssUrls.split("\n").filter(Boolean) : [];
+      const newSources = Array.from(new Set([...currentSources, ...allThemeSources]));
+      await persistRSS(newSources);
+
+      // 3. 更新订阅主题列表
+      const newSubscribedThemes = Array.from(new Set([...subscribedThemeIds, selectedTheme.id]));
+
+      // 4. 保存设置
+      const newSettings = {
+        ...settings,
+        webhookUrl: webhookUrl,
+        pushTime: modalConfig.pushTime,
+        pushDays: modalConfig.pushDays,
+        subscribedThemes: newSubscribedThemes,
+        configCompleted: true,
+      };
+      delete (newSettings as any).rssUrls;
+      await persistSettings(newSettings);
+
+      // 5. 更新本地状态
+      setSettings({ ...newSettings, rssUrls: newSources.join("\n") });
+      setSubscribedThemeIds(newSubscribedThemes);
+      setIsModalOpen(false);
+
+      // 6. 显示成功提示
+      setToastMsg("✅ 订阅成功！「" + selectedTheme.title + "」已加入您的订阅列表");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (e) {
+      console.error("Subscribe failed:", e);
+      setToastMsg("订阅失败，请重试");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFeedbackSubmit = async () => {
