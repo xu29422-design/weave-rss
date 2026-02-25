@@ -8,7 +8,7 @@ import {
   Sparkles, Cpu, Newspaper, Book, Gamepad2, LineChart, 
   Clock, CheckCircle2, Plus, User, LogOut, Settings2, 
   Heart, Zap, LayoutGrid, Bell, ArrowRight, Loader2, Rss,
-  Palette, Bitcoin, Code2, Activity, BrainCircuit, Search, X, Globe, AlertCircle
+  Palette, Bitcoin, Code2, Activity, BrainCircuit, Search, X, Globe, AlertCircle, Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchCurrentConfig, persistSettings, persistRSS, triggerDigest } from "../config/actions";
@@ -411,7 +411,6 @@ function DashboardContent() {
   const [digestSending, setDigestSending] = useState(false);
   const [digestSendingFrom, setDigestSendingFrom] = useState<string | null>(null);
   const [digestRunStartAt, setDigestRunStartAt] = useState<number | null>(null);
-  const [showLongWaitHint, setShowLongWaitHint] = useState(false);
 
   useEffect(() => {
     async function init() {
@@ -504,12 +503,48 @@ function DashboardContent() {
     }
   };
 
+  /** 取消订阅：从已订阅列表中移除该主题并持久化 */
+  const handleUnsubscribeTheme = async (themeId: string) => {
+    if (!confirm("确定要取消订阅该主题吗？")) return;
+    const newSubscribedThemes = subscribedThemeIds.filter((id) => id !== themeId);
+    try {
+      const newSettings = { ...settings, subscribedThemes: newSubscribedThemes };
+      delete (newSettings as any).rssUrls;
+      await persistSettings(newSettings);
+      setSubscribedThemeIds(newSubscribedThemes);
+      setToastMsg("已取消订阅");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 2000);
+    } catch (e) {
+      setToastMsg("取消订阅失败，请重试");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 2000);
+    }
+  };
+
+  /** 取消超级订阅：清除关键词并持久化 */
+  const handleUnsubscribeSuperSub = async () => {
+    if (!confirm("确定要取消超级订阅吗？")) return;
+    try {
+      const newSettings = { ...settings, superSubKeyword: "" };
+      delete (newSettings as any).rssUrls;
+      await persistSettings(newSettings);
+      setSettings((prev: any) => ({ ...prev, superSubKeyword: "" }));
+      setToastMsg("已取消超级订阅");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 2000);
+    } catch (e) {
+      setToastMsg("取消失败，请重试");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 2000);
+    }
+  };
+
   /** 立即发送：不传则用全部订阅；传则仅用该卡片的 RSS 源。cardKey 用于仅在该卡片上显示 loading */
   const handleTriggerDigest = async (cardRssUrls?: string[], cardKey?: string) => {
     if (digestSending) return;
     setDigestSending(true);
     setDigestSendingFrom(cardKey ?? null);
-    setShowLongWaitHint(false);
     setDigestRunStartAt(Date.now());
     setDigestRunStatus({ status: "running", progress: 0, message: "正在提交…" });
     try {
@@ -526,40 +561,25 @@ function DashboardContent() {
 
   useEffect(() => {
     if (!digestSending || digestRunStatus?.status === "success" || digestRunStatus?.status === "failed") return;
-    const progress = digestRunStatus?.progress ?? 0;
-    const intervalMs = progress >= 70 ? 1000 : 2000;
     const t = setInterval(async () => {
       try {
         const res = await fetch("/api/digest-run-status");
         const data = await res.json();
         setDigestRunStatus((prev) => {
           if (data.status === "idle" && prev?.status === "running") return prev;
-          if (data.status === "running" && data.progress === 0 && prev?.status === "running" && (prev?.progress ?? 0) > 0) return prev;
           return data;
         });
         if (data.status === "success" || data.status === "failed") {
           setDigestSending(false);
           setDigestSendingFrom(null);
           setDigestRunStartAt(null);
-          setShowLongWaitHint(false);
           setTimeout(() => setDigestRunStatus(null), 4000);
         }
       } catch (_) {}
-    }, intervalMs);
+    }, 2000);
     return () => clearInterval(t);
-  }, [digestSending, digestRunStatus?.status, digestRunStatus?.progress]);
+  }, [digestSending, digestRunStatus?.status]);
 
-  // 运行超过约 15 秒时显示「长时间等待」小字提示
-  useEffect(() => {
-    if (digestRunStatus?.status !== "running" || !digestRunStartAt) return;
-    const elapsed = Date.now() - digestRunStartAt;
-    if (elapsed >= 15000) {
-      setShowLongWaitHint(true);
-      return;
-    }
-    const timer = setTimeout(() => setShowLongWaitHint(true), 15000 - elapsed);
-    return () => clearTimeout(timer);
-  }, [digestRunStatus?.status, digestRunStartAt]);
 
   const openAddSourceModal = (themeId: string) => {
     setAddSourceTargetThemeId(themeId);
@@ -1210,9 +1230,20 @@ function DashboardContent() {
                         className="break-inside-avoid group relative flex flex-col"
                       >
                         <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-blue-500/20 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5">
-                          {/* 已订阅标签 */}
-                          <div className="absolute top-6 right-6 px-4 py-1.5 bg-green-500/20 text-green-300 text-[10px] font-black rounded-full border border-green-500/30 uppercase tracking-widest">
-                            已订阅
+                          {/* 已订阅标签 + 取消订阅 */}
+                          <div className="absolute top-6 right-6 flex items-center gap-2">
+                            <span className="px-4 py-1.5 bg-green-500/20 text-green-300 text-[10px] font-black rounded-full border border-green-500/30 uppercase tracking-widest">
+                              已订阅
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleUnsubscribeTheme(themeId)}
+                              className="p-2 rounded-lg text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                              title="取消订阅"
+                              aria-label="取消订阅"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                           
                           {/* 头部信息 */}
@@ -1266,9 +1297,20 @@ function DashboardContent() {
                   {settings.superSubKeyword && (
                     <div className="break-inside-avoid relative flex flex-col">
                       <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-blue-500/20 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5">
-                        {/* 已订阅标签 */}
-                        <div className="absolute top-6 right-6 px-4 py-1.5 bg-green-500/20 text-green-300 text-[10px] font-black rounded-full border border-green-500/30 uppercase tracking-widest">
-                          已订阅
+                        {/* 已订阅标签 + 取消订阅 */}
+                        <div className="absolute top-6 right-6 flex items-center gap-2">
+                          <span className="px-4 py-1.5 bg-green-500/20 text-green-300 text-[10px] font-black rounded-full border border-green-500/30 uppercase tracking-widest">
+                            已订阅
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleUnsubscribeSuperSub}
+                            className="p-2 rounded-lg text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            title="取消超级订阅"
+                            aria-label="取消超级订阅"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                         
                         {/* 头部信息 */}
@@ -1502,38 +1544,19 @@ function DashboardContent() {
                   setDigestSending(false);
                   setDigestSendingFrom(null);
                   setDigestRunStartAt(null);
-                  setShowLongWaitHint(false);
                 }}
                 className="absolute top-3 right-3 p-1 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
                 aria-label="关闭"
               >
                 <X className="w-4 h-4" />
               </button>
-              <div className="pr-8 mb-2">
+              <div className="pr-8">
                 <span className="text-sm font-bold text-white">
-                  {digestRunStatus.status === "running" && (digestRunStatus.message || "正在生成简报…")}
+                  {digestRunStatus.status === "running" && "简报生成中，预计需要 3～5 分钟，请稍候。"}
                   {digestRunStatus.status === "success" && "✅ 简报生成完成"}
                   {digestRunStatus.status === "failed" && `❌ ${digestRunStatus.message || "失败"}`}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 min-w-0 h-2 bg-white/10 rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full bg-blue-500 rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${digestRunStatus.progress}%` }}
-                    transition={{ duration: 0.3 }}
-                  />
-                </div>
-                {(digestRunStatus.status === "running" || digestRunStatus.status === "success") && (
-                  <span className="text-xs font-black text-blue-200 shrink-0 w-8 text-right">{digestRunStatus.progress}%</span>
-                )}
-              </div>
-              {digestRunStatus.status === "running" && showLongWaitHint && (digestRunStatus.progress ?? 0) < 75 && (
-                <p className="mt-2 text-[10px] text-white/60">
-                  生成通常需 1–2 分钟，请耐心等待。
-                </p>
-              )}
             </motion.div>
           )}
         </AnimatePresence>
