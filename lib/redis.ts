@@ -348,6 +348,7 @@ export interface PushLog {
     sourceCount: number;
     channelCount?: number;
     successCount?: number;
+    partCount?: number;
   };
 }
 
