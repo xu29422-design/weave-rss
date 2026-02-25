@@ -104,7 +104,7 @@ export default function OnboardingPage() {
       .split("\n")
       .map((u) => u.trim())
       .filter(Boolean);
-    return [...new Set([...fromRecommended, ...fromCustom])];
+    return Array.from(new Set([...fromRecommended, ...fromCustom]));
   };
 
   const handleUseFreeApi = async () => {
