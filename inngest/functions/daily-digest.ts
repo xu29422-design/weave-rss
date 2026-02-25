@@ -18,8 +18,8 @@ const CATEGORY_MAP: Record<string, string> = {
 const ITEMS_PER_BATCH = 40;
 /** 预筛选上限，最多保留两批的量 */
 const FILTER_TOP_LIMIT = 80;
-/** 单步内最多分析条数，避免 FUNCTION_INVOCATION_TIMEOUT */
-const ANALYZE_CHUNK_SIZE = 10;
+/** 单步内最多分析条数（免费套餐 60s 上限，5 条约 30s 内更安全） */
+const ANALYZE_CHUNK_SIZE = 5;
 
 /**
  * 智能延迟函数：智谱需要更长的间隔
