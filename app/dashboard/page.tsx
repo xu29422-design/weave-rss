@@ -1494,13 +1494,27 @@ function DashboardContent() {
               exit={{ opacity: 0, x: 24 }}
               className="fixed bottom-8 right-8 z-[180] w-full max-w-sm px-5 py-4 bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl"
             >
+              <button
+                type="button"
+                onClick={() => {
+                  setDigestRunStatus(null);
+                  setDigestSending(false);
+                  setDigestSendingFrom(null);
+                  setDigestRunStartAt(null);
+                  setShowLongWaitHint(false);
+                }}
+                className="absolute top-3 right-3 p-1 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                aria-label="关闭"
+              >
+                <X className="w-4 h-4" />
+              </button>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-bold text-white">
+                <span className="text-sm font-bold text-white pr-6">
                   {digestRunStatus.status === "running" && (digestRunStatus.message || "正在生成简报…")}
-                  {digestRunStatus.status === "success" && "✅ 已推送"}
+                  {digestRunStatus.status === "success" && "✅ 简报生成完成"}
                   {digestRunStatus.status === "failed" && `❌ ${digestRunStatus.message || "失败"}`}
                 </span>
-                {digestRunStatus.status === "running" && (
+                {(digestRunStatus.status === "running" || digestRunStatus.status === "success") && (
                   <span className="text-xs font-black text-blue-200 shrink-0 ml-2">{digestRunStatus.progress}%</span>
                 )}
               </div>
@@ -1512,7 +1526,7 @@ function DashboardContent() {
                   transition={{ duration: 0.3 }}
                 />
               </div>
-              {digestRunStatus.status === "running" && showLongWaitHint && (
+              {digestRunStatus.status === "running" && showLongWaitHint && (digestRunStatus.progress ?? 0) < 75 && (
                 <p className="mt-2 text-[10px] text-white/60">
                   生成通常需 1–2 分钟，请耐心等待。
                 </p>

@@ -176,10 +176,10 @@ export const digestWorker = inngest.createFunction(
         });
         sections.push(catContent);
       }
-      await setDigestRunStatus(userId, { status: "running", progress: 68 + i * 4, message: "简报生成完成" });
+      await setDigestRunStatus(userId, { status: "running", progress: 68 + i * 4, message: "简报内容已就绪，正在准备推送…" });
       batchResults.push({ tldr, sections, highQualityItems });
     }
-    await setDigestRunStatus(userId, { status: "running", progress: 75, message: "简报生成完成" });
+    await setDigestRunStatus(userId, { status: "running", progress: 75, message: "正在组装与推送…" });
 
     const finalReport = await step.run("assemble-and-send", async () => {
       await setDigestRunStatus(userId, { status: "running", progress: 90, message: "内容推送中" });
@@ -478,7 +478,7 @@ export const digestWorker = inngest.createFunction(
       await setDigestRunStatus(userId, {
         status: hasSuccess ? "success" : "failed",
         progress: 100,
-        message: hasSuccess ? "已推送" : "推送失败",
+        message: hasSuccess ? "简报生成完成" : "推送失败",
         finishedAt: new Date().toISOString(),
       });
 
