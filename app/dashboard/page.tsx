@@ -406,9 +406,10 @@ function DashboardContent() {
   // 存储每个主题的自定义源
   const [customThemeSources, setCustomThemeSources] = useState<Record<string, string[]>>({});
 
-  // 立即发送简报：运行状态与轮询
+  // 立即发送简报：运行状态与轮询；digestSendingFrom 表示当前是哪张卡片在发送（仅该卡显示 loading）
   const [digestRunStatus, setDigestRunStatus] = useState<{ status: string; progress: number; message?: string } | null>(null);
   const [digestSending, setDigestSending] = useState(false);
+  const [digestSendingFrom, setDigestSendingFrom] = useState<string | null>(null);
   const [digestRunStartAt, setDigestRunStartAt] = useState<number | null>(null);
   const [showLongWaitHint, setShowLongWaitHint] = useState(false);
 
@@ -503,10 +504,11 @@ function DashboardContent() {
     }
   };
 
-  /** 立即发送：不传则用全部订阅；传则仅用该卡片的 RSS 源 */
-  const handleTriggerDigest = async (cardRssUrls?: string[]) => {
+  /** 立即发送：不传则用全部订阅；传则仅用该卡片的 RSS 源。cardKey 用于仅在该卡片上显示 loading */
+  const handleTriggerDigest = async (cardRssUrls?: string[], cardKey?: string) => {
     if (digestSending) return;
     setDigestSending(true);
+    setDigestSendingFrom(cardKey ?? null);
     setShowLongWaitHint(false);
     setDigestRunStartAt(Date.now());
     setDigestRunStatus({ status: "running", progress: 0, message: "正在提交…" });
@@ -514,6 +516,7 @@ function DashboardContent() {
       await triggerDigest(cardRssUrls?.length ? cardRssUrls : undefined);
     } catch (e) {
       setDigestSending(false);
+      setDigestSendingFrom(null);
       setDigestRunStartAt(null);
       setDigestRunStatus({ status: "failed", progress: 0, message: "提交失败" });
       setTimeout(() => setDigestRunStatus(null), 3000);
@@ -535,6 +538,7 @@ function DashboardContent() {
         });
         if (data.status === "success" || data.status === "failed") {
           setDigestSending(false);
+          setDigestSendingFrom(null);
           setDigestRunStartAt(null);
           setShowLongWaitHint(false);
           setTimeout(() => setDigestRunStatus(null), 4000);
@@ -1244,11 +1248,11 @@ function DashboardContent() {
                             </div>
                             <button
                               type="button"
-                              onClick={() => handleTriggerDigest(allSources)}
+                              onClick={() => handleTriggerDigest(allSources, theme.id)}
                               disabled={digestSending}
                               className="mt-4 w-full py-3 rounded-xl font-bold text-sm bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-60 transition-all flex items-center justify-center gap-2"
                             >
-                              {digestSending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                              {digestSending && digestSendingFrom === theme.id ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                               立即发送
                             </button>
                           </div>
@@ -1291,11 +1295,11 @@ function DashboardContent() {
                           </div>
                           <button
                             type="button"
-                            onClick={() => handleTriggerDigest()}
+                            onClick={() => handleTriggerDigest(undefined, "super")}
                             disabled={digestSending}
                             className="w-full py-3 rounded-xl font-bold text-sm bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-60 transition-all flex items-center justify-center gap-2"
                           >
-                            {digestSending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                            {digestSending && digestSendingFrom === "super" ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                             立即发送
                           </button>
                         </div>
@@ -1341,11 +1345,11 @@ function DashboardContent() {
                             )}
                             <button
                               type="button"
-                              onClick={() => { handleTriggerDigest(customRssSources); }}
+                              onClick={() => { handleTriggerDigest(customRssSources, "custom"); }}
                               disabled={digestSending}
                               className="mt-6 w-full py-3 rounded-xl font-bold text-sm bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-60 transition-all flex items-center justify-center gap-2"
                             >
-                              {digestSending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                              {digestSending && digestSendingFrom === "custom" ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                               立即发送
                             </button>
                           </div>
@@ -1510,7 +1514,7 @@ function DashboardContent() {
               </div>
               {digestRunStatus.status === "running" && showLongWaitHint && (
                 <p className="mt-2 text-[10px] text-white/60">
-                  生成通常需 1–2 分钟，请耐心等待。若长时间无更新，请确认已运行 <code className="bg-white/10 px-1 rounded">npm run inngest</code>。
+                  生成通常需 1–2 分钟，请耐心等待。
                 </p>
               )}
             </motion.div>

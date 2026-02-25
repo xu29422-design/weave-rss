@@ -18,6 +18,8 @@ const CATEGORY_MAP: Record<string, string> = {
 const ITEMS_PER_BATCH = 40;
 /** 预筛选上限，最多保留两批的量 */
 const FILTER_TOP_LIMIT = 80;
+/** 单步内最多分析条数，避免 FUNCTION_INVOCATION_TIMEOUT */
+const ANALYZE_CHUNK_SIZE = 10;
 
 /**
  * 智能延迟函数：智谱需要更长的间隔
@@ -128,48 +130,56 @@ export const digestWorker = inngest.createFunction(
       console.log(`📦 当日内容较多，拆成 ${batches.length} 批处理并推送（上/下）`);
     }
 
-    // 每批分别：AI 分析
+    // 每批分别：AI 分析（拆成多步，每步最多 ANALYZE_CHUNK_SIZE 条，避免单步超时）
     const analyzedBatches: any[][] = [];
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
-      const analyzed = await step.run(`analyze-batch-${i}`, async () => {
-        await setDigestRunStatus(userId, { status: "running", progress: 28 + i * 12, message: "AI 分析中" });
-        const results = [];
-        for (const item of batch) {
-          const result = await analyzeItem(item, settings!);
-          results.push(result);
-          await smartDelay(settings!);
-        }
-        await setDigestRunStatus(userId, { status: "running", progress: 38 + i * 12, message: "AI 分析完成" });
-        return results;
-      });
-      analyzedBatches.push(analyzed);
+      const parts: any[][] = [];
+      for (let start = 0; start < batch.length; start += ANALYZE_CHUNK_SIZE) {
+        const chunk = batch.slice(start, start + ANALYZE_CHUNK_SIZE);
+        const partIndex = Math.floor(start / ANALYZE_CHUNK_SIZE);
+        const analyzedChunk = await step.run(`analyze-batch-${i}-part-${partIndex}`, async () => {
+          await setDigestRunStatus(userId, { status: "running", progress: 28 + i * 8 + partIndex * 2, message: "AI 分析中" });
+          const results = [];
+          for (const item of chunk) {
+            const result = await analyzeItem(item, settings!);
+            results.push(result);
+            await smartDelay(settings!);
+          }
+          return results;
+        });
+        parts.push(analyzedChunk);
+      }
+      await setDigestRunStatus(userId, { status: "running", progress: 38 + i * 12, message: "AI 分析完成" });
+      analyzedBatches.push(parts.flat());
     }
 
-    // 每批分别：TLDR + 分类综述（合并为一个 step 减少步骤数）
-    const batchResults: { tldr: string; sections: { category: string; content: string }[]; highQualityItems: any[] }[] = await step.run("generate-batch-content", async () => {
-      await setDigestRunStatus(userId, { status: "running", progress: 55, message: "正在生成简报…" });
-      const out: { tldr: string; sections: { category: string; content: string }[]; highQualityItems: any[] }[] = [];
-      for (let i = 0; i < analyzedBatches.length; i++) {
-        const highQualityItems = analyzedBatches[i];
-        const tldr =
-          highQualityItems.length === 0
-            ? "🌟 **今日焦点**\n\n本批暂无高价值行业动态。"
-            : (await generateTLDR(highQualityItems.map((j) => j.summary).join("\n"), settings!)) ||
-              "🌟 **今日焦点**\n\n已抓取 " + highQualityItems.length + " 篇资讯。";
-        const categories = Array.from(new Set(highQualityItems.map((j) => j.category)));
-        const sections: { category: string; content: string }[] = [];
-        for (const cat of categories) {
+    // 每批分别：TLDR 与分类综述拆成独立 step，避免单步过长
+    const batchResults: { tldr: string; sections: { category: string; content: string }[]; highQualityItems: any[] }[] = [];
+    for (let i = 0; i < analyzedBatches.length; i++) {
+      const highQualityItems = analyzedBatches[i];
+      const tldr = await step.run(`generate-tldr-batch-${i}`, async () => {
+        await setDigestRunStatus(userId, { status: "running", progress: 52 + i * 6, message: "正在生成简报…" });
+        if (highQualityItems.length === 0) return "🌟 **今日焦点**\n\n本批暂无高价值行业动态。";
+        return (await generateTLDR(highQualityItems.map((j) => j.summary).join("\n"), settings!)) ||
+          "🌟 **今日焦点**\n\n已抓取 " + highQualityItems.length + " 篇资讯。";
+      });
+      const categories = Array.from(new Set(highQualityItems.map((j) => j.category)));
+      const sections: { category: string; content: string }[] = [];
+      for (let c = 0; c < categories.length; c++) {
+        const cat = categories[c];
+        const catContent = await step.run(`generate-section-batch-${i}-cat-${c}`, async () => {
           const catItems = highQualityItems.filter((j) => j.category === cat);
           const content = await writeCategorySection(CATEGORY_MAP[cat] || cat, catItems, settings!);
-          sections.push({ category: CATEGORY_MAP[cat] || cat, content });
           await smartDelay(settings!);
-        }
-        out.push({ tldr, sections, highQualityItems });
+          return { category: CATEGORY_MAP[cat] || cat, content };
+        });
+        sections.push(catContent);
       }
-      await setDigestRunStatus(userId, { status: "running", progress: 75, message: "简报生成完成" });
-      return out;
-    });
+      await setDigestRunStatus(userId, { status: "running", progress: 68 + i * 4, message: "简报生成完成" });
+      batchResults.push({ tldr, sections, highQualityItems });
+    }
+    await setDigestRunStatus(userId, { status: "running", progress: 75, message: "简报生成完成" });
 
     const finalReport = await step.run("assemble-and-send", async () => {
       await setDigestRunStatus(userId, { status: "running", progress: 90, message: "内容推送中" });
