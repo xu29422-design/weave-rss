@@ -417,7 +417,7 @@ export default function OnboardingPage() {
                       type="password"
                       value={geminiApiKey}
                       onChange={(e) => setGeminiApiKey(e.target.value)}
-                      placeholder="留空则使用免费额度"
+                      placeholder="输入apikey"
                       className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white placeholder:text-white/30 focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>

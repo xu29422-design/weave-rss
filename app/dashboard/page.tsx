@@ -1437,7 +1437,7 @@ function DashboardContent() {
                           type="password" 
                           value={settings.geminiApiKey || ""} 
                           onChange={(e) => setSettings({...settings, geminiApiKey: e.target.value})}
-                          placeholder="留空则使用免费额度"
+                          placeholder="输入apikey"
                           className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-base outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/50"
                         />
                       </div>

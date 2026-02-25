@@ -1,7 +1,7 @@
 import { inngest } from "../client";
 import { getSettings, getRSSSources, savePushLog, saveSettings, getPushChannels, getAllThemePushConfigs, getThemePushConfig, PushChannel, setDigestRunStatus } from "@/lib/redis";
 import { fetchNewItems } from "@/lib/rss-utils";
-import { analyzeItem, writeCategorySection, generateTLDR, shortenContent, filterTopItems } from "@/lib/ai-service";
+import { analyzeItem, generateConsolidatedReport, generateTLDR, shortenContent, filterTopItems } from "@/lib/ai-service";
 import { getAllActiveUsers } from "@/lib/auth";
 import { pushDigestToKdocs, getFirstDBSheetId } from "@/lib/kdocs-api";
 import { createWPSDBSheetRecord } from "@/lib/wps-dbsheet-api";
@@ -154,7 +154,7 @@ export const digestWorker = inngest.createFunction(
       analyzedBatches.push(parts.flat());
     }
 
-    // 每批分别：TLDR 与分类综述拆成独立 step，避免单步过长
+    // 每批分别：TLDR + 聚合报告（一次 AI 将整批聚成 3～6 个主题段，每段标题+内容+链接）
     const batchResults: { tldr: string; sections: { category: string; content: string }[]; highQualityItems: any[] }[] = [];
     for (let i = 0; i < analyzedBatches.length; i++) {
       const highQualityItems = analyzedBatches[i];
@@ -164,20 +164,16 @@ export const digestWorker = inngest.createFunction(
         return (await generateTLDR(highQualityItems.map((j) => j.summary).join("\n"), settings!)) ||
           "🌟 **今日焦点**\n\n已抓取 " + highQualityItems.length + " 篇资讯。";
       });
-      const categories = Array.from(new Set(highQualityItems.map((j) => j.category)));
-      const sections: { category: string; content: string }[] = [];
-      for (let c = 0; c < categories.length; c++) {
-        const cat = categories[c];
-        const catContent = await step.run(`generate-section-batch-${i}-cat-${c}`, async () => {
-          const catItems = highQualityItems.filter((j) => j.category === cat);
-          const content = await writeCategorySection(CATEGORY_MAP[cat] || cat, catItems, settings!);
-          await smartDelay(settings!);
-          return { category: CATEGORY_MAP[cat] || cat, content };
-        });
-        sections.push(catContent);
-      }
+      const { sections } = await step.run(`generate-consolidated-batch-${i}`, async () => {
+        await setDigestRunStatus(userId, { status: "running", progress: 60 + i * 4, message: "正在聚合主题与撰写…" });
+        if (highQualityItems.length === 0) return { sections: [] as { category: string; content: string }[] };
+        return generateConsolidatedReport(
+          highQualityItems.map((j) => ({ title: j.title, summary: j.summary, link: j.link, category: j.category })),
+          settings!
+        );
+      });
       await setDigestRunStatus(userId, { status: "running", progress: 68 + i * 4, message: "简报内容已就绪，正在准备推送…" });
-      batchResults.push({ tldr, sections, highQualityItems });
+      batchResults.push({ tldr, sections: sections || [], highQualityItems });
     }
     await setDigestRunStatus(userId, { status: "running", progress: 75, message: "正在组装与推送…" });
 

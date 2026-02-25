@@ -1,7 +1,7 @@
 import { google } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
-import { ANALYST_PROMPT, EDITOR_PROMPT, TLDR_PROMPT } from "./ai-prompts";
+import { ANALYST_PROMPT, EDITOR_PROMPT, TLDR_PROMPT, CONSOLIDATED_REPORT_PROMPT } from "./ai-prompts";
 import { RawRSSItem } from "./rss-utils";
 import { Settings } from "./redis";
 
@@ -129,6 +129,69 @@ export async function writeCategorySection(category: string, items: any[], setti
     if (isContentSafetyError(e)) {
       console.warn(`[writeCategorySection] 内容安全拦截，使用降级文案: ${category}`, e?.message);
       return fallback;
+    }
+    throw e;
+  }
+}
+
+/**
+ * 聚合报告：将整批资讯聚成 3～6 个主题段，每段有标题和展开内容，每条内容后附链接
+ * 返回 sections 供简报组装使用（与原先按分类的 sections 结构一致）
+ */
+export async function generateConsolidatedReport(
+  items: { title: string; summary: string; link: string; category?: string }[],
+  settings: Settings
+): Promise<{ sections: { category: string; content: string }[] }> {
+  const validItems = items.filter((i) => i.link && (i.summary || i.title));
+  if (validItems.length === 0) {
+    return { sections: [] };
+  }
+
+  const { model } = getAIModel(settings);
+  const inputList = validItems
+    .map((i) => `- **${i.title}**：${i.summary || ""} 链接：${i.link}`)
+    .join("\n");
+
+  const fallbackSections = [
+    {
+      category: "今日动态",
+      content: validItems
+        .map((i) => `- **${i.title}** ${(i.summary || "").slice(0, 80)} [链接](${i.link})`)
+        .join("\n"),
+    },
+  ];
+
+  try {
+    const { text } = await withRetry(() =>
+      generateText({
+        model,
+        system: CONSOLIDATED_REPORT_PROMPT(validItems.length),
+        prompt: inputList,
+      } as any)
+    );
+
+    const raw = (text || "").trim();
+    if (!raw) return { sections: fallbackSections };
+
+    // 解析 ### 小标题 + 段落，拆成 sections
+    const blocks = raw.split(/\n(?=###\s+)/).filter(Boolean);
+    const sections: { category: string; content: string }[] = [];
+
+    for (const block of blocks) {
+      const firstLineEnd = block.indexOf("\n");
+      let title = firstLineEnd >= 0 ? block.slice(0, firstLineEnd) : block;
+      let content = firstLineEnd >= 0 ? block.slice(firstLineEnd + 1) : "";
+      title = title.replace(/^###\s*/, "").trim();
+      content = content.trim();
+      if (title) sections.push({ category: title, content });
+    }
+
+    if (sections.length > 0) return { sections };
+    return { sections: [{ category: "今日动态", content: raw }] };
+  } catch (e: any) {
+    if (isContentSafetyError(e)) {
+      console.warn("[generateConsolidatedReport] 内容安全拦截，使用降级列表", e?.message);
+      return { sections: fallbackSections };
     }
     throw e;
   }
