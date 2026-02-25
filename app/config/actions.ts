@@ -21,15 +21,18 @@ async function getCurrentUserId(): Promise<string | null> {
 
 /**
  * 手动触发一次简报生成任务
+ * @param rssUrls 可选。若传入则仅使用这些 RSS 源（针对当前卡片）；不传则使用用户全部订阅源
  */
-export async function triggerDigest() {
+export async function triggerDigest(rssUrls?: string[]) {
   const userId = await getCurrentUserId();
   if (!userId) throw new Error("未登录");
 
-  // 使用 inngest 客户端发送事件，这在服务端是安全的
+  const payload: { userId: string; rssUrls?: string[] } = { userId };
+  if (rssUrls?.length) payload.rssUrls = rssUrls;
+
   await inngest.send({
     name: "digest/generate",
-    data: { userId },
+    data: payload,
   });
 
   return { success: true };
@@ -73,6 +76,7 @@ export async function persistSettings(settings: Settings) {
   
   await saveSettings(userId, settings);
   revalidatePath("/config");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -87,7 +91,49 @@ export async function persistRSS(rssUrls: string[]) {
   
   await saveRSSSources(userId, rssUrls);
   revalidatePath("/config");
+  revalidatePath("/onboarding");
   return { success: true };
+}
+
+/**
+ * 向指定 Webhook URL 发送一条测试消息（与日报推送同格式）
+ */
+export async function testWebhook(webhookUrl: string): Promise<{ success: boolean; error?: string }> {
+  if (!webhookUrl?.trim()) return { success: false, error: "请填写 Webhook 地址" };
+  try {
+    const payload = {
+      msgtype: "markdown",
+      markdown: {
+        text: "**【Weave 测试消息】**\n\n这是一条来自 Weave 的测试推送，说明你的 Webhook 已配置成功。之后 RSS 分析结果将推送到此处。"
+      }
+    };
+    const res = await fetch(webhookUrl.trim(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      return { success: false, error: `HTTP ${res.status}: ${text.slice(0, 100)}` };
+    }
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e?.message || "请求失败" };
+  }
+}
+
+/**
+ * 标记新手引导已完成
+ */
+export async function markOnboardingCompleted() {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error("未登录");
+  const settings = await getSettings(userId);
+  if (settings) {
+    await saveSettings(userId, { ...settings, onboardingCompleted: true });
+  }
+  revalidatePath("/onboarding");
+  revalidatePath("/dashboard");
 }
 
 /**

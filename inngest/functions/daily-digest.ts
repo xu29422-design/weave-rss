@@ -1,5 +1,5 @@
 import { inngest } from "../client";
-import { getSettings, getRSSSources, savePushLog, saveSettings, getPushChannels, getAllThemePushConfigs, getThemePushConfig, PushChannel } from "@/lib/redis";
+import { getSettings, getRSSSources, savePushLog, saveSettings, getPushChannels, getAllThemePushConfigs, getThemePushConfig, PushChannel, setDigestRunStatus } from "@/lib/redis";
 import { fetchNewItems } from "@/lib/rss-utils";
 import { analyzeItem, writeCategorySection, generateTLDR, shortenContent, filterTopItems } from "@/lib/ai-service";
 import { getAllActiveUsers } from "@/lib/auth";
@@ -13,6 +13,11 @@ const CATEGORY_MAP: Record<string, string> = {
   'Coding': '💻 技术实战',
   'Other': '🔍 其它资讯'
 };
+
+/** 单批最多条目数，超过则拆成两批分别喂 AI 并推送两次（上/下） */
+const ITEMS_PER_BATCH = 40;
+/** 预筛选上限，最多保留两批的量 */
+const FILTER_TOP_LIMIT = 80;
 
 /**
  * 智能延迟函数：智谱需要更长的间隔
@@ -75,198 +80,170 @@ export const digestWorker = inngest.createFunction(
   { event: "digest/generate" },
   async ({ event, step }) => {
     const userId = event.data.userId as string;
-    
-    console.log(`🔄 开始处理用户 ${userId} 的简报...`);
+    const cardRssUrls = (event.data.rssUrls as string[] | undefined)?.filter(Boolean);
 
-    const { settings, rssSources } = await step.run("get-config", async () => {
-      const s = await getSettings(userId);
-      const r = await getRSSSources(userId);
-      return { settings: s, rssSources: r };
+    try {
+      await setDigestRunStatus(userId, { status: "running", progress: 0, message: "正在准备…" });
+      console.log(`🔄 开始处理用户 ${userId} 的简报...${cardRssUrls?.length ? ` (仅本卡片 ${cardRssUrls.length} 个源)` : ""}`);
+
+      const { settings, rssSources, useSuperSub } = await step.run("get-config", async () => {
+        const s = await getSettings(userId);
+        const r = cardRssUrls?.length ? cardRssUrls : await getRSSSources(userId);
+        const useSuperSub = !cardRssUrls?.length; // 仅当「全部源」时启用超级订阅
+        return { settings: s, rssSources: r, useSuperSub };
+      });
+
+      if (!settings || rssSources.length === 0) {
+        console.log(`⚠️ 用户 ${userId} 配置不完整，跳过`);
+        await setDigestRunStatus(userId, { status: "failed", progress: 0, message: "配置不完整", finishedAt: new Date().toISOString() });
+        return { status: "skipped", reason: "Missing config" };
+      }
+
+      const newItems = await step.run("fetch-and-dedupe", async () => {
+        await setDigestRunStatus(userId, { status: "running", progress: 10, message: "RSS 抓取中" });
+        const superKeyword = useSuperSub ? settings?.superSubKeyword : undefined;
+        const items = await fetchNewItems(userId, rssSources, superKeyword);
+        await setDigestRunStatus(userId, { status: "running", progress: 20, message: "RSS 抓取完成" });
+        return items;
+      });
+
+      if (newItems.length === 0) {
+        await setDigestRunStatus(userId, { status: "success", progress: 100, message: "暂无新内容", finishedAt: new Date().toISOString() });
+        return { status: "completed", reason: "No new items" };
+      }
+
+    // AI 预筛选：条目多时多选一些，超过 ITEMS_PER_BATCH 则拆成两批
+    const filterLimit = Math.min(newItems.length, FILTER_TOP_LIMIT);
+    const filteredItems = await step.run("pre-filter-items", async () => {
+      return await filterTopItems(newItems, settings!, filterLimit);
     });
 
-    if (!settings || rssSources.length === 0) {
-      console.log(`⚠️ 用户 ${userId} 配置不完整，跳过`);
-      return { status: "skipped", reason: "Missing config" };
+    const batches = filteredItems.length <= ITEMS_PER_BATCH
+      ? [filteredItems]
+      : [
+          filteredItems.slice(0, ITEMS_PER_BATCH),
+          filteredItems.slice(ITEMS_PER_BATCH, FILTER_TOP_LIMIT),
+        ];
+    if (batches.length > 1) {
+      console.log(`📦 当日内容较多，拆成 ${batches.length} 批处理并推送（上/下）`);
     }
 
-    const newItems = await step.run("fetch-and-dedupe", async () => {
-      return await fetchNewItems(userId, rssSources, settings?.superSubKeyword);
-    });
-
-    if (newItems.length === 0) return { status: "completed", reason: "No new items" };
-
-    // AI 预筛选：从海量标题中选出最值得分析的 20 条
-    const filteredItems = await step.run("pre-filter-items", async () => {
-      return await filterTopItems(newItems, settings!);
-    });
-
-    // AI 分析（串行 + 延迟）
-    const analyzedItems = await step.run("analyze-items", async () => {
-      const results = [];
-      for (const item of filteredItems) {
-        const result = await analyzeItem(item, settings!);
-        results.push(result);
-        console.log(`[AI 评分] ${result.score}分 - ${result.title.substring(0, 30)}...`);
-        await smartDelay(settings!);
-      }
-      
-      // 统计评分分布
-      const scoreDistribution: Record<number, number> = {};
-      results.forEach(r => {
-        scoreDistribution[r.score] = (scoreDistribution[r.score] || 0) + 1;
+    // 每批分别：AI 分析
+    const analyzedBatches: any[][] = [];
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      const analyzed = await step.run(`analyze-batch-${i}`, async () => {
+        await setDigestRunStatus(userId, { status: "running", progress: 28 + i * 12, message: "AI 分析中" });
+        const results = [];
+        for (const item of batch) {
+          const result = await analyzeItem(item, settings!);
+          results.push(result);
+          await smartDelay(settings!);
+        }
+        await setDigestRunStatus(userId, { status: "running", progress: 38 + i * 12, message: "AI 分析完成" });
+        return results;
       });
-      console.log("=== 评分分布 ===", scoreDistribution);
-      
-      return results;
-    });
+      analyzedBatches.push(analyzed);
+    }
 
-    // 【临时】：移除评分过滤，让所有文章都通过，确保能收到推送
-    const highQualityItems = analyzedItems; // 原本是: .filter(item => item.score >= 5)
-    
-    console.log(`✅ 总共 ${analyzedItems.length} 篇，临时取消评分过滤，全部保留`);
-    
-    const tldr = await step.run("generate-tldr", async () => {
-      if (highQualityItems.length === 0) {
-        return "🌟 **今日焦点**\n\n当前订阅源中暂无高价值（评分 >= 5）的行业动态。系统已成功运行，但未发现值得推送的内容。";
+    // 每批分别：TLDR + 分类综述（合并为一个 step 减少步骤数）
+    const batchResults: { tldr: string; sections: { category: string; content: string }[]; highQualityItems: any[] }[] = await step.run("generate-batch-content", async () => {
+      await setDigestRunStatus(userId, { status: "running", progress: 55, message: "正在生成简报…" });
+      const out: { tldr: string; sections: { category: string; content: string }[]; highQualityItems: any[] }[] = [];
+      for (let i = 0; i < analyzedBatches.length; i++) {
+        const highQualityItems = analyzedBatches[i];
+        const tldr =
+          highQualityItems.length === 0
+            ? "🌟 **今日焦点**\n\n本批暂无高价值行业动态。"
+            : (await generateTLDR(highQualityItems.map((j) => j.summary).join("\n"), settings!)) ||
+              "🌟 **今日焦点**\n\n已抓取 " + highQualityItems.length + " 篇资讯。";
+        const categories = Array.from(new Set(highQualityItems.map((j) => j.category)));
+        const sections: { category: string; content: string }[] = [];
+        for (const cat of categories) {
+          const catItems = highQualityItems.filter((j) => j.category === cat);
+          const content = await writeCategorySection(CATEGORY_MAP[cat] || cat, catItems, settings!);
+          sections.push({ category: CATEGORY_MAP[cat] || cat, content });
+          await smartDelay(settings!);
+        }
+        out.push({ tldr, sections, highQualityItems });
       }
-      const allSummaries = highQualityItems.map(i => i.summary).join("\n");
-      const res = await generateTLDR(allSummaries, settings!);
-      return res || "🌟 **今日焦点**\n\nAI 摘要生成失败，但已抓取到 " + highQualityItems.length + " 篇高质量资讯。";
-    });
-
-    const categories = Array.from(new Set(highQualityItems.map(i => i.category)));
-    
-    // 【关键修复】：改为串行生成分类综述，避免并发超限
-    const sections = await step.run("generate-sections", async () => {
-      if (categories.length === 0) return [];
-      
-      const results = [];
-      for (const cat of categories) {
-        const catItems = highQualityItems.filter(i => i.category === cat);
-        console.log(`正在生成分类 "${CATEGORY_MAP[cat] || cat}" 的综述...`);
-        
-        const content = await writeCategorySection(CATEGORY_MAP[cat] || cat, catItems, settings!);
-        results.push({ category: CATEGORY_MAP[cat] || cat, content });
-        
-        // 每个分类之间增加延迟
-        await smartDelay(settings!);
-      }
-      return results;
+      await setDigestRunStatus(userId, { status: "running", progress: 75, message: "简报生成完成" });
+      return out;
     });
 
     const finalReport = await step.run("assemble-and-send", async () => {
+      await setDigestRunStatus(userId, { status: "running", progress: 90, message: "内容推送中" });
       console.log("=== 开始组装简报 ===");
-      
-      let lines: string[] = [];
-      
-      // 标题
-      lines.push("## AI 行业简报");
-      lines.push("");
-      
-      // TL;DR
-      if (tldr && tldr.trim().length > 0) {
-        lines.push(tldr.trim());
-        lines.push("");
+
+      const MAX_LENGTH = 4800;
+      const MAX_RETRIES = 2;
+      const pushResults: any = { channels: {} };
+      const allReportContents: string[] = [];
+      const allHighQualityItems: any[] = [];
+
+      const channels = await getPushChannels(userId);
+      const themeConfigs = await getAllThemePushConfigs(userId);
+      const subscribedThemes = settings!.subscribedThemes || [];
+      const channelsToPush = new Map<string, { channel: PushChannel; isPrimary: boolean }>();
+
+      for (const themeId of subscribedThemes) {
+        const themeConfig = themeConfigs[themeId];
+        if (themeConfig) {
+          const primaryChannel = channels.find((c) => c.id === themeConfig.primaryChannelId);
+          if (primaryChannel && primaryChannel.enabled !== false) {
+            channelsToPush.set(primaryChannel.id, { channel: primaryChannel, isPrimary: true });
+          }
+          if (themeConfig.secondaryChannelIds) {
+            for (const channelId of themeConfig.secondaryChannelIds) {
+              const ch = channels.find((c) => c.id === channelId);
+              if (ch && ch.enabled !== false) channelsToPush.set(ch.id, { channel: ch, isPrimary: false });
+            }
+          }
+        }
       }
-      
-      // 各分类内容（保留链接）
-      if (sections.length > 0) {
+      if (channelsToPush.size === 0 && settings!.webhookUrl) {
+        channelsToPush.set("legacy-webhook", {
+          channel: {
+            id: "legacy-webhook",
+            type: "webhook",
+            name: "默认机器人",
+            webhookUrl: settings!.webhookUrl,
+            enabled: true,
+          } as PushChannel,
+          isPrimary: true,
+        });
+      }
+
+      // 按批组装并推送（一批一条消息；两批则推送「今日简报（上）」「今日简报（下）」）
+      for (let partIndex = 0; partIndex < batchResults.length; partIndex++) {
+        const { tldr, sections, highQualityItems } = batchResults[partIndex];
+        const partTitle = batchResults.length > 1 ? (partIndex === 0 ? "今日简报（上）" : "今日简报（下）") : "AI 行业简报";
+
+        let lines: string[] = ["## " + partTitle, "", (tldr || "").trim(), ""];
         sections.forEach((s, idx) => {
-          if (s && s.content && s.content.trim().length > 0) {
+          if (s?.content?.trim()) {
             lines.push(`### ${idx + 1}. ${s.category}`);
             lines.push("");
             lines.push(s.content.trim());
             lines.push("");
           }
         });
-      }
-      
-      // 页脚
-      lines.push("---");
-      lines.push("");
-      lines.push("> 本报告由 Weave 编织生成");
-      
-      let reportContent = lines.join("\n");
-      
-      // 【新增】：长度校验与 AI 自动精简逻辑
-      const MAX_LENGTH = 4800; // 预留余量
-      let retryCount = 0;
-      const MAX_RETRIES = 2;
+        lines.push("---", "", "> 本报告由 Weave 编织生成");
+        let reportContent = lines.join("\n");
 
-      while (reportContent.length > MAX_LENGTH && retryCount < MAX_RETRIES) {
-        console.log(`⚠️ 内容超长 (${reportContent.length}字)，正在进行第 ${retryCount + 1} 次 AI 精简...`);
-        const shortened = await shortenContent(reportContent, settings!);
-        if (shortened && shortened.length < reportContent.length) {
-          reportContent = shortened;
-        } else {
-          console.log("❌ AI 精简未能显著减少字数，跳过本次尝试");
+        let retryCount = 0;
+        while (reportContent.length > MAX_LENGTH && retryCount < MAX_RETRIES) {
+          const shortened = await shortenContent(reportContent, settings!);
+          if (shortened && shortened.length < reportContent.length) reportContent = shortened;
+          retryCount++;
         }
-        retryCount++;
-      }
-
-      // 如果依然超长，进行硬截断（保底方案）
-      if (reportContent.length > 5000) {
-        console.log("🚨 AI 精简后依然超长，执行硬截断保底...");
-        reportContent = reportContent.substring(0, 4900) + "\n\n...(内容过长已截断)";
-      }
-      
-      console.log("最终简报长度:", reportContent.length, "字符");
-      console.log("前300字预览:\n", reportContent.substring(0, 300));
-
-      // 推送结果
-      const pushResults: any = {
-        channels: {},
-      };
-
-      // 获取推送渠道和订阅配置
-      const channels = await getPushChannels(userId);
-      const themeConfigs = await getAllThemePushConfigs(userId);
-      const subscribedThemes = settings.subscribedThemes || [];
-
-      // 收集需要推送的渠道（去重）
-      const channelsToPush = new Map<string, { channel: PushChannel; isPrimary: boolean }>();
-
-      // 遍历已订阅的主题，收集推送渠道
-      for (const themeId of subscribedThemes) {
-        const themeConfig = themeConfigs[themeId];
-        
-        if (themeConfig) {
-          // 使用订阅的推送渠道配置
-          const primaryChannel = channels.find(c => c.id === themeConfig.primaryChannelId);
-          if (primaryChannel && primaryChannel.enabled !== false) {
-            channelsToPush.set(primaryChannel.id, { channel: primaryChannel, isPrimary: true });
-          }
-
-          if (themeConfig.secondaryChannelIds) {
-            for (const channelId of themeConfig.secondaryChannelIds) {
-              const channel = channels.find(c => c.id === channelId);
-              if (channel && channel.enabled !== false) {
-                channelsToPush.set(channel.id, { channel, isPrimary: false });
-              }
-            }
-          }
+        if (reportContent.length > 5000) {
+          reportContent = reportContent.substring(0, 4900) + "\n\n...(内容过长已截断)";
         }
-      }
+        allReportContents.push(reportContent);
+        allHighQualityItems.push(...highQualityItems);
 
-      // 如果没有订阅配置，使用全局配置（向后兼容）
-      if (channelsToPush.size === 0) {
-        // 使用旧的全局 webhook 配置
-        if (settings!.webhookUrl) {
-          channelsToPush.set('legacy-webhook', {
-            channel: {
-              id: 'legacy-webhook',
-              type: 'webhook',
-              name: '默认机器人',
-              webhookUrl: settings!.webhookUrl,
-              enabled: true,
-            } as PushChannel,
-            isPrimary: true,
-          });
-        }
-      }
-
-      // 推送到所有收集到的渠道
-      for (const [channelId, { channel, isPrimary }] of Array.from(channelsToPush.entries())) {
+        for (const [channelId, { channel, isPrimary }] of Array.from(channelsToPush.entries())) {
         try {
           if (channel.type === 'webhook' && channel.webhookUrl) {
             // 推送到 Webhook
@@ -458,16 +435,15 @@ export const digestWorker = inngest.createFunction(
         }
       }
 
-      // 记录推送日志
+      }
+
       const channelResults = Object.values(pushResults.channels);
       const hasSuccess = channelResults.some((r: any) => r.success);
-      const hasFailure = channelResults.some((r: any) => !r.success);
-      
       await savePushLog(userId, {
-        status: hasSuccess ? 'success' : 'failed',
-        error: hasFailure ? JSON.stringify(pushResults) : undefined,
+        status: hasSuccess ? "success" : "failed",
+        error: channelResults.some((r: any) => !r.success) ? JSON.stringify(pushResults) : undefined,
         digestData: {
-          highQualityItems: highQualityItems.map((item) => ({
+          highQualityItems: allHighQualityItems.map((item) => ({
             title: item.title,
             summary: item.summary,
             link: item.link,
@@ -475,28 +451,43 @@ export const digestWorker = inngest.createFunction(
             score: item.score,
           })),
         },
-        reportContent,
+        reportContent: allReportContents.join("\n\n---\n\n"),
         details: {
-          themeCount: settings.subscribedThemes?.length || 0,
+          themeCount: settings!.subscribedThemes?.length || 0,
           sourceCount: rssSources.length,
           channelCount: channelResults.length,
           successCount: channelResults.filter((r: any) => r.success).length,
-        }
+          partCount: batchResults.length,
+        },
       });
 
-      // 返回结果
+      await setDigestRunStatus(userId, {
+        status: hasSuccess ? "success" : "failed",
+        progress: 100,
+        message: hasSuccess ? "已推送" : "推送失败",
+        finishedAt: new Date().toISOString(),
+      });
+
       if (channelResults.length > 0) {
         return {
           status: hasSuccess ? "sent" : "partial_failed",
-          length: reportContent.length,
+          partCount: batchResults.length,
           pushResults,
         };
       }
-      
       return { status: "no_push_target" };
     });
 
     return finalReport;
+    } catch (err: any) {
+      await setDigestRunStatus(userId, {
+        status: "failed",
+        progress: 0,
+        message: err?.message || "运行出错",
+        finishedAt: new Date().toISOString(),
+      });
+      throw err;
+    }
   }
 );
 

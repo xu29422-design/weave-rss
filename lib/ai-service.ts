@@ -24,6 +24,12 @@ function getAIModel(settings: Settings) {
   }
 }
 
+/** 是否为内容安全/敏感内容类错误（不重试，直接降级） */
+function isContentSafetyError(error: any): boolean {
+  const msg = String(error?.message ?? error?.code ?? "");
+  return /敏感|不安全|AI_APICallError|content.*policy|safety/i.test(msg);
+}
+
 /**
  * 带指数退避的重试包装器
  */
@@ -35,14 +41,16 @@ async function withRetry<T>(
   try {
     return await fn();
   } catch (error: any) {
-    // 如果是速率限制 (429) 或服务器错误 (5xx)，则重试
+    if (isContentSafetyError(error)) {
+      console.warn("AI 内容安全策略拦截，不重试:", error?.message);
+      throw error;
+    }
     const isRateLimit = error?.status === 429 || error?.message?.includes("429");
     const isServerError = error?.status >= 500 || error?.message?.includes("500");
-    
     if (retries > 0 && (isRateLimit || isServerError)) {
       console.warn(`AI 请求失败，正在重试 (${retries} 次剩余)... 错误: ${error.message}`);
       await new Promise(resolve => setTimeout(resolve, delay));
-      return withRetry(fn, retries - 1, delay * 2); // 指数退避
+      return withRetry(fn, retries - 1, delay * 2);
     }
     throw error;
   }
@@ -94,46 +102,65 @@ export async function analyzeItem(item: RawRSSItem, settings: Settings) {
 
 /**
  * Editor Agent: 撰写分类长文
+ * 若遇内容安全策略拦截则返回降级文案，不中断整次简报
  */
 export async function writeCategorySection(category: string, items: any[], settings: Settings) {
   const { model } = getAIModel(settings);
   const validItems = items.filter(i => i.score > 0 && i.summary !== "解析失败");
-  
+  const fallback = `**${category}**\n\n本分类因内容策略未生成 AI 综述，以下为原文链接：\n\n${validItems.map(i => `- [${i.title}](${i.link})`).join("\n")}`;
+
   if (validItems.length === 0) return "(数据包为空，没有内容)";
 
   let systemPrompt = settings.editorPrompt || EDITOR_PROMPT(category, validItems.length);
-  // 如果是用户自定义提示词，手动替换占位符
   if (settings.editorPrompt) {
     systemPrompt = systemPrompt
       .replace(/\$\{category\}/g, category)
       .replace(/\$\{count\}/g, validItems.length.toString());
   }
 
-  const { text } = await generateText({
-    model,
-    system: systemPrompt,
-    prompt: validItems.map(i => `- ${i.title}: ${i.summary} (URL: ${i.link})`).join("\n"),
-  } as any);
-  return text;
+  try {
+    const { text } = await generateText({
+      model,
+      system: systemPrompt,
+      prompt: validItems.map(i => `- ${i.title}: ${i.summary} (URL: ${i.link})`).join("\n"),
+    } as any);
+    return text;
+  } catch (e: any) {
+    if (isContentSafetyError(e)) {
+      console.warn(`[writeCategorySection] 内容安全拦截，使用降级文案: ${category}`, e?.message);
+      return fallback;
+    }
+    throw e;
+  }
 }
 
 /**
  * 生成全局 TL;DR
+ * 若遇内容安全策略拦截则返回降级文案
  */
 export async function generateTLDR(allSummaries: string, settings: Settings) {
+  const defaultTldr = "🌟 **今日焦点**\n\n今日资讯源中未发现高价值情报，或摘要因内容策略未生成。";
   if (!allSummaries || (allSummaries.includes("解析失败") && allSummaries.length < 20)) {
-    return "🌟 今日焦点 今日资讯源中未发现高价值情报。";
+    return defaultTldr;
   }
 
   const { model } = getAIModel(settings);
   const systemPrompt = settings.tldrPrompt || TLDR_PROMPT;
 
-  const { text } = await generateText({
-    model,
-    system: systemPrompt,
-    prompt: allSummaries,
-  } as any);
-  return text;
+  try {
+    const { text } = await generateText({
+      model,
+      system: systemPrompt,
+      prompt: allSummaries,
+    } as any);
+    return text;
+  } catch (e: any) {
+    if (isContentSafetyError(e)) {
+      console.warn("[generateTLDR] 内容安全拦截，使用默认摘要", e?.message);
+      return defaultTldr;
+    }
+    throw e;
+  }
 }
 
 /**

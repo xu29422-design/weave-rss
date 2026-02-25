@@ -1,7 +1,7 @@
 import Parser from "rss-parser";
 import { kv } from "@vercel/kv";
 import { saveRawRSSItems } from "@/lib/redis";
-import { subDays, isAfter } from "date-fns";
+import { subHours, isAfter } from "date-fns";
 import crypto from "crypto";
 
 const parser = new Parser();
@@ -86,24 +86,28 @@ function cleanHtml(html: string): string {
     .trim();
 }
 
+// 单源安全上限，仅防个别 feed 返回数千条导致超时/内存问题
+const SAFE_ITEMS_PER_FEED = 500;
+// 全局安全上限，防止单次任务量过大
+const SAFE_TOTAL_ITEMS = 2000;
+
 /**
- * 抓取并解析所有 RSS 源，过滤出近期的增量条目
+ * 抓取并解析所有 RSS 源，过滤出「过去 24 小时内」发布的条目（不设 50/100 条数限制，仅安全上限）
  */
 export async function fetchNewItems(userId: string, urls: string[], superSubKeyword?: string): Promise<RawRSSItem[]> {
-  // 修改为只抓取 24 小时内的内容，节省 Token
-  const oneDayAgo = subDays(new Date(), 1);
-  const MAX_ITEMS_PER_FEED = 50; // 恢复单源抓取上限，确保覆盖面
-  const MAX_TOTAL_ITEMS = 100;  // 总量限制在 100 篇
+  const now = new Date();
+  const cutoff24h = subHours(now, 24);
 
   // 黑名单关键词：过滤掉明显非新闻的内容
   const BLACKLIST = ["推广", "广告", "招聘", "诚聘", "合作", "联系我们", "版权所有", "订阅我们"];
 
-  console.log(`开始抓取 ${urls.length} 个 RSS 源...`);
+  console.log(`开始抓取 ${urls.length} 个 RSS 源（过去 24 小时，单源上限 ${SAFE_ITEMS_PER_FEED}，总上限 ${SAFE_TOTAL_ITEMS}）...`);
 
   const feedPromises = urls.map(async (url) => {
     try {
       const feed = await parser.parseURL(url);
-      const limitedItems = feed.items.slice(0, MAX_ITEMS_PER_FEED).map((item) => {
+      // 不限制条数，只做安全截断，避免单源过大
+      const items = feed.items.slice(0, SAFE_ITEMS_PER_FEED).map((item) => {
         const fullContent = item.content || item["content:encoded"] || item.contentSnippet || item.description || "";
         return {
           title: item.title || "无标题",
@@ -113,7 +117,7 @@ export async function fetchNewItems(userId: string, urls: string[], superSubKeyw
           sourceName: feed.title || "未知源",
         };
       });
-      return limitedItems;
+      return items;
     } catch (error) {
       console.error(`抓取 RSS 失败: ${url}`, error);
       return [];
@@ -125,18 +129,13 @@ export async function fetchNewItems(userId: string, urls: string[], superSubKeyw
 
   // 1. 黑名单过滤 + 标题长度过滤
   const preFilteredItems = flattenedItems.filter(item => {
-    // 标题太短（小于 4 个字）通常没有实质内容
     if (item.title.length < 4) return false;
-    
-    // 黑名单匹配
     const hasBlacklistWord = BLACKLIST.some(word => item.title.includes(word));
     if (hasBlacklistWord) return false;
-
     return true;
   });
 
   // 2. 超级订阅（白名单）优先级排序
-  // 如果标题包含用户最想看的主题关键词，排到最前面
   if (superSubKeyword) {
     preFilteredItems.sort((a, b) => {
       const aHasKeyword = a.title.includes(superSubKeyword) ? 1 : 0;
@@ -145,23 +144,25 @@ export async function fetchNewItems(userId: string, urls: string[], superSubKeyw
     });
   }
 
-  const cappedItems = preFilteredItems.slice(0, MAX_TOTAL_ITEMS);
-
-  console.log(`✅ 抓取完成: ${flattenedItems.length} 篇，预过滤后: ${preFilteredItems.length} 篇，限流后: ${cappedItems.length} 篇`);
-
-  // 时间过滤
-  const recentItems = cappedItems.filter((item) => {
+  // 时间过滤：仅保留过去 24 小时内发布的内容
+  const recentItems = preFilteredItems.filter((item) => {
     try {
-      return isAfter(new Date(item.pubDate), oneDayAgo);
+      return isAfter(new Date(item.pubDate), cutoff24h);
     } catch {
       return false;
     }
   });
 
-  console.log(`✅ 时间过滤: ${recentItems.length} 篇`);
+  // 安全上限：防止单次任务量过大导致超时/OOM
+  const cappedItems = recentItems.slice(0, SAFE_TOTAL_ITEMS);
+  if (recentItems.length > SAFE_TOTAL_ITEMS) {
+    console.log(`⚠️ 近期条目 ${recentItems.length} 篇，已截断为 ${SAFE_TOTAL_ITEMS} 篇`);
+  }
+
+  console.log(`✅ 抓取完成: ${flattenedItems.length} 篇，预过滤后: ${preFilteredItems.length} 篇，过去24h: ${recentItems.length} 篇，安全截断后: ${cappedItems.length} 篇`);
 
   // 第一层去重：标题语义去重（快速，在内存中完成）
-  const titleDedupedItems = deduplicateByTitle(recentItems, 0.75);
+  const titleDedupedItems = deduplicateByTitle(cappedItems, 0.75);
 
   // 保存原始 RSS 条目（26 小时窗口，独立去重）
   await saveRawRSSItems(

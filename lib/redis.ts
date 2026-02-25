@@ -16,6 +16,7 @@ export interface Settings {
   pushDays?: number[]; // 推送日期 (0-6，0代表周日)
   projectName?: string; // 订阅项目名称
   configCompleted?: boolean; // 标记配置是否已全部完成
+  onboardingCompleted?: boolean; // 是否已完成新手引导（5 步教程）
   configMode?: 'simple' | 'pro'; // 配置模式
   subscribedThemes?: string[]; // 已订阅的主题ID列表
   superSubKeyword?: string; // 超级订阅关键词
@@ -184,6 +185,10 @@ function getUserRSSKey(userId: string): string {
   return `user:${userId}:rss_sources`;
 }
 
+function getDigestRunStatusKey(userId: string): string {
+  return `user:${userId}:digest_run_status`;
+}
+
 function getUserRawRSSKey(userId: string): string {
   return `user:${userId}:rss_raw`;
 }
@@ -239,6 +244,25 @@ export async function getRSSSources(userId: string): Promise<string[]> {
 export async function saveRSSSources(userId: string, sources: string[]) {
   if (!globalKv) throw new Error("KV 客户端未初始化");
   await globalKv.set(getUserRSSKey(userId), sources);
+}
+
+/** 简报手动运行状态（用于前端进度条） */
+export interface DigestRunStatus {
+  status: "idle" | "running" | "success" | "failed";
+  progress: number; // 0-100
+  message?: string;
+  finishedAt?: string;
+}
+
+export async function getDigestRunStatus(userId: string): Promise<DigestRunStatus | null> {
+  if (!globalKv) return null;
+  const v = await globalKv.get<DigestRunStatus>(getDigestRunStatusKey(userId));
+  return v || null;
+}
+
+export async function setDigestRunStatus(userId: string, data: DigestRunStatus): Promise<void> {
+  if (!globalKv) return;
+  await globalKv.set(getDigestRunStatusKey(userId), data);
 }
 
 /**

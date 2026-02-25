@@ -342,11 +342,6 @@ export default function Home() {
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
             className="space-y-10"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm text-blue-200 rounded-full text-sm font-bold border border-white/20 shadow-sm">
-              <Sparkles className="w-4 h-4" />
-              <span className="font-mono tracking-tight">AI-POWERED INTELLIGENCE</span>
-            </div>
-            
             <h1 className="text-5xl md:text-6xl lg:text-8xl font-black leading-[1.1] tracking-tighter text-white drop-shadow-[0_0_50px_rgba(0,200,255,0.2)] font-serif">
               <motion.span 
                 initial={{ opacity: 0, x: -20 }}
@@ -367,7 +362,7 @@ export default function Home() {
             </h1>
             
             <p className="text-xl md:text-2xl text-blue-50 max-w-xl leading-relaxed font-medium drop-shadow-md">
-              RSS 自动聚合，AI 深度精读。每日高价值情报，直达您的 <span className="text-cyan-200 font-bold border-b border-cyan-200/50 pb-0.5 shadow-cyan-500/50">邮箱</span> 或 <span className="text-cyan-200 font-bold border-b border-cyan-200/50 pb-0.5 shadow-cyan-500/50">WPS协作群聊机器人</span>。
+              使用RSS的能力，帮助你获取想要的信息，并直达你的WPS协作机器人
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4">
@@ -537,10 +532,9 @@ export default function Home() {
             ].map((feature, idx) => (
               <motion.div 
                 key={idx}
-                whileHover={{ y: -10 }}
-                className="group relative p-10 rounded-[2.5rem] bg-[#111827]/80 border border-white/10 hover:border-blue-400/30 hover:bg-[#1f2937]/90 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-300 backdrop-blur-xl"
+                className="relative p-10 rounded-[2.5rem] bg-[#111827]/80 border border-white/10 backdrop-blur-xl"
               >
-                <div className="absolute top-8 right-8 text-6xl font-black text-white/30 font-mono group-hover:text-white/40 transition-colors">
+                <div className="absolute top-8 right-8 text-6xl font-black text-white/30 font-mono">
                   {feature.step}
                 </div>
                 <div className="relative z-10">
@@ -551,9 +545,6 @@ export default function Home() {
                   <p className="text-blue-50 leading-relaxed font-medium">
                     {feature.desc}
                   </p>
-                </div>
-                <div className="mt-8 flex items-center text-sm font-bold text-blue-300 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0">
-                  了解更多 <ChevronRight className="w-4 h-4 ml-1" />
                 </div>
               </motion.div>
             ))}

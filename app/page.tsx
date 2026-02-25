@@ -289,7 +289,7 @@ export default function EnterPage() {
                 <span className="absolute inset-0 text-blue-600 blur-[2px] -translate-x-[2px] opacity-30">Weave</span>
               </h1>
               <p className="text-blue-200/80 text-xs tracking-[0.5em] uppercase mb-12">
-                信息的迷雾，令人惘然；众人所盼，一面出口
+                解决AI时代下信息获取与阅读的焦虑感
               </p>
               
               <motion.button
@@ -332,7 +332,7 @@ export default function EnterPage() {
           transition={{ delay: 2 }}
           className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/50 text-xs tracking-widest uppercase"
         >
-          Scroll to Fly
+          designed by Xu
         </motion.div>
       )}
     </div>

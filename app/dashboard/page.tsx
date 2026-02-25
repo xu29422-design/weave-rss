@@ -11,7 +11,7 @@ import {
   Palette, Bitcoin, Code2, Activity, BrainCircuit, Search, X, Globe, AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { fetchCurrentConfig, persistSettings, persistRSS } from "../config/actions";
+import { fetchCurrentConfig, persistSettings, persistRSS, triggerDigest } from "../config/actions";
 import { pushToAdminBot } from "../config/admin-actions";
 
 // 类型定义
@@ -405,7 +405,12 @@ function DashboardContent() {
   const [newSourceUrl, setNewSourceUrl] = useState("");
   // 存储每个主题的自定义源
   const [customThemeSources, setCustomThemeSources] = useState<Record<string, string[]>>({});
-  
+
+  // 立即发送简报：运行状态与轮询
+  const [digestRunStatus, setDigestRunStatus] = useState<{ status: string; progress: number; message?: string } | null>(null);
+  const [digestSending, setDigestSending] = useState(false);
+  const [digestRunStartAt, setDigestRunStartAt] = useState<number | null>(null);
+  const [showLongWaitHint, setShowLongWaitHint] = useState(false);
 
   useEffect(() => {
     async function init() {
@@ -489,7 +494,6 @@ function DashboardContent() {
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 这里应该有一个 loading 状态，暂时省略
     try {
       await persistSettings(settings);
       alert("个人中心配置已保存！");
@@ -498,6 +502,54 @@ function DashboardContent() {
       alert("保存失败，请重试。");
     }
   };
+
+  /** 立即发送：不传则用全部订阅；传则仅用该卡片的 RSS 源 */
+  const handleTriggerDigest = async (cardRssUrls?: string[]) => {
+    if (digestSending) return;
+    setDigestSending(true);
+    setShowLongWaitHint(false);
+    setDigestRunStartAt(Date.now());
+    setDigestRunStatus({ status: "running", progress: 0, message: "正在提交…" });
+    try {
+      await triggerDigest(cardRssUrls?.length ? cardRssUrls : undefined);
+    } catch (e) {
+      setDigestSending(false);
+      setDigestRunStartAt(null);
+      setDigestRunStatus({ status: "failed", progress: 0, message: "提交失败" });
+      setTimeout(() => setDigestRunStatus(null), 3000);
+      return;
+    }
+  };
+
+  useEffect(() => {
+    if (!digestSending || digestRunStatus?.status === "success" || digestRunStatus?.status === "failed") return;
+    const t = setInterval(async () => {
+      try {
+        const res = await fetch("/api/digest-run-status");
+        const data = await res.json();
+        setDigestRunStatus(data);
+        if (data.status === "success" || data.status === "failed") {
+          setDigestSending(false);
+          setDigestRunStartAt(null);
+          setShowLongWaitHint(false);
+          setTimeout(() => setDigestRunStatus(null), 4000);
+        }
+      } catch (_) {}
+    }, 2000);
+    return () => clearInterval(t);
+  }, [digestSending, digestRunStatus?.status]);
+
+  // 运行超过约 15 秒时显示「长时间等待」小字提示
+  useEffect(() => {
+    if (digestRunStatus?.status !== "running" || !digestRunStartAt) return;
+    const elapsed = Date.now() - digestRunStartAt;
+    if (elapsed >= 15000) {
+      setShowLongWaitHint(true);
+      return;
+    }
+    const timer = setTimeout(() => setShowLongWaitHint(true), 15000 - elapsed);
+    return () => clearTimeout(timer);
+  }, [digestRunStatus?.status, digestRunStartAt]);
 
   const openAddSourceModal = (themeId: string) => {
     setAddSourceTargetThemeId(themeId);
@@ -1185,6 +1237,15 @@ function DashboardContent() {
                                 </div>
                               ))}
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => handleTriggerDigest(allSources)}
+                              disabled={digestSending}
+                              className="mt-4 w-full py-3 rounded-xl font-bold text-sm bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-60 transition-all flex items-center justify-center gap-2"
+                            >
+                              {digestSending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                              立即发送
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -1218,16 +1279,25 @@ function DashboardContent() {
                           </div>
                         </div>
 
-                        <div className="mt-8 pt-8 border-t border-white/10">
+                        <div className="mt-8 pt-8 border-t border-white/10 space-y-4">
                           <div className="flex items-center gap-2">
                             <Rss className="w-4 h-4 text-blue-100/50" />
                             <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">全网检索中</span>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => handleTriggerDigest()}
+                            disabled={digestSending}
+                            className="w-full py-3 rounded-xl font-bold text-sm bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-60 transition-all flex items-center justify-center gap-2"
+                          >
+                            {digestSending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                            立即发送
+                          </button>
                         </div>
                       </div>
                     </div>
                   )}
-                  
+
                   {/* 自定义 RSS 源（不属于任何主题的） */}
                   {(() => {
                     const allThemesSources = subscribedThemeIds.flatMap(id => {
@@ -1249,7 +1319,7 @@ function DashboardContent() {
                               <Plus className="w-5 h-5" />
                             </div>
                             <div>
-                              <h3 className="text-xl font-black text-white font-serif">自定义源</h3>
+                              <h3 className="text-xl font-black text-white font-serif">{settings.projectName?.trim() || "自定义源"}</h3>
                               <p className="text-xs text-blue-100/80 font-bold uppercase tracking-widest mt-1">{customRssSources.length} 个信源</p>
                             </div>
                           </div>
@@ -1264,6 +1334,15 @@ function DashboardContent() {
                             {customRssSources.length > 5 && (
                               <p className="text-[10px] text-blue-100/80 font-black uppercase tracking-widest text-center pt-2">还有 {customRssSources.length - 5} 个更多源...</p>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => { handleTriggerDigest(customRssSources); }}
+                              disabled={digestSending}
+                              className="mt-6 w-full py-3 rounded-xl font-bold text-sm bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-60 transition-all flex items-center justify-center gap-2"
+                            >
+                              {digestSending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                              立即发送
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -1393,6 +1472,42 @@ function DashboardContent() {
 
                 {/* 底部按钮移除，已移至顶部 */}
               </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 立即发送进度条 - 右下角 */}
+        <AnimatePresence>
+          {digestRunStatus != null && (
+            <motion.div
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 24 }}
+              className="fixed bottom-8 right-8 z-[180] w-full max-w-sm px-5 py-4 bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-white">
+                  {digestRunStatus.status === "running" && (digestRunStatus.message || "正在生成简报…")}
+                  {digestRunStatus.status === "success" && "✅ 已推送"}
+                  {digestRunStatus.status === "failed" && `❌ ${digestRunStatus.message || "失败"}`}
+                </span>
+                {digestRunStatus.status === "running" && (
+                  <span className="text-xs font-black text-blue-200 shrink-0 ml-2">{digestRunStatus.progress}%</span>
+                )}
+              </div>
+              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-blue-500 rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${digestRunStatus.progress}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+              {digestRunStatus.status === "running" && showLongWaitHint && (
+                <p className="mt-2 text-[10px] text-white/60">
+                  生成通常需 1–2 分钟，请耐心等待。若长时间无更新，请确认已运行 <code className="bg-white/10 px-1 rounded">npm run inngest</code>。
+                </p>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
