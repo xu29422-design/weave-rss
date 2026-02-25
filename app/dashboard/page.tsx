@@ -527,7 +527,12 @@ function DashboardContent() {
       try {
         const res = await fetch("/api/digest-run-status");
         const data = await res.json();
-        setDigestRunStatus(data);
+        // 避免轮询结果把进度条“拉回去”：正在发送时不要用 idle 覆盖；已有进度时不要被另一轮任务的 0% 覆盖
+        setDigestRunStatus((prev) => {
+          if (data.status === "idle" && prev?.status === "running") return prev;
+          if (data.status === "running" && data.progress === 0 && prev?.status === "running" && (prev?.progress ?? 0) > 0) return prev;
+          return data;
+        });
         if (data.status === "success" || data.status === "failed") {
           setDigestSending(false);
           setDigestRunStartAt(null);

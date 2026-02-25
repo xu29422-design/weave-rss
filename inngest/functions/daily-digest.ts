@@ -263,18 +263,20 @@ export const digestWorker = inngest.createFunction(
             });
 
             const responseText = await response.text();
-            let result;
+            let result: any;
             try {
               result = JSON.parse(responseText);
             } catch (e) {
               result = { raw: responseText };
             }
-            
-            if (response.status === 200 || response.ok) {
+            const httpOk = response.status === 200 || response.ok;
+            const bodyOk = result && typeof result.errcode === "number" ? result.errcode === 0 : true;
+            if (httpOk && bodyOk) {
               console.log(`✅ 推送到 ${channel.name} 成功！`);
               pushResults.channels[channelId] = { success: true, type: 'webhook', name: channel.name, response: result };
             } else {
-              console.error(`❌ 推送到 ${channel.name} 失败:`, result);
+              if (httpOk && !bodyOk) console.error(`❌ 推送到 ${channel.name} 失败（接口返回 errcode）:`, result);
+              else console.error(`❌ 推送到 ${channel.name} 失败:`, result);
               pushResults.channels[channelId] = { success: false, type: 'webhook', name: channel.name, error: result };
             }
           } else if (channel.type === 'email' && channel.emailAddress) {
@@ -419,18 +421,20 @@ export const digestWorker = inngest.createFunction(
         });
 
         const responseText = await response.text();
-        let result;
+        let result: any;
         try {
           result = JSON.parse(responseText);
         } catch (e) {
           result = { raw: responseText };
         }
-        
-        if (response.status === 200 || response.ok) {
+        const httpOk = response.status === 200 || response.ok;
+        const bodyOk = result && typeof result.errcode === "number" ? result.errcode === 0 : true;
+        if (httpOk && bodyOk) {
           console.log("✅ 简报发送到机器人成功！");
           pushResults.channels['legacy-webhook'] = { success: true, type: 'webhook', name: '默认机器人', response: result };
         } else {
-          console.error("❌ 发送到机器人失败:", result);
+          if (httpOk && !bodyOk) console.error("❌ 发送到机器人失败（接口返回 errcode）:", result);
+          else console.error("❌ 发送到机器人失败:", result);
           pushResults.channels['legacy-webhook'] = { success: false, type: 'webhook', name: '默认机器人', error: result };
         }
       }
