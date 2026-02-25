@@ -526,11 +526,12 @@ function DashboardContent() {
 
   useEffect(() => {
     if (!digestSending || digestRunStatus?.status === "success" || digestRunStatus?.status === "failed") return;
+    const progress = digestRunStatus?.progress ?? 0;
+    const intervalMs = progress >= 70 ? 1000 : 2000;
     const t = setInterval(async () => {
       try {
         const res = await fetch("/api/digest-run-status");
         const data = await res.json();
-        // 避免轮询结果把进度条“拉回去”：正在发送时不要用 idle 覆盖；已有进度时不要被另一轮任务的 0% 覆盖
         setDigestRunStatus((prev) => {
           if (data.status === "idle" && prev?.status === "running") return prev;
           if (data.status === "running" && data.progress === 0 && prev?.status === "running" && (prev?.progress ?? 0) > 0) return prev;
@@ -544,9 +545,9 @@ function DashboardContent() {
           setTimeout(() => setDigestRunStatus(null), 4000);
         }
       } catch (_) {}
-    }, 2000);
+    }, intervalMs);
     return () => clearInterval(t);
-  }, [digestSending, digestRunStatus?.status]);
+  }, [digestSending, digestRunStatus?.status, digestRunStatus?.progress]);
 
   // 运行超过约 15 秒时显示「长时间等待」小字提示
   useEffect(() => {
@@ -1508,23 +1509,25 @@ function DashboardContent() {
               >
                 <X className="w-4 h-4" />
               </button>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-bold text-white pr-6">
+              <div className="pr-8 mb-2">
+                <span className="text-sm font-bold text-white">
                   {digestRunStatus.status === "running" && (digestRunStatus.message || "正在生成简报…")}
                   {digestRunStatus.status === "success" && "✅ 简报生成完成"}
                   {digestRunStatus.status === "failed" && `❌ ${digestRunStatus.message || "失败"}`}
                 </span>
-                {(digestRunStatus.status === "running" || digestRunStatus.status === "success") && (
-                  <span className="text-xs font-black text-blue-200 shrink-0 ml-2">{digestRunStatus.progress}%</span>
-                )}
               </div>
-              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-blue-500 rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${digestRunStatus.progress}%` }}
-                  transition={{ duration: 0.3 }}
-                />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0 h-2 bg-white/10 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-blue-500 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${digestRunStatus.progress}%` }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </div>
+                {(digestRunStatus.status === "running" || digestRunStatus.status === "success") && (
+                  <span className="text-xs font-black text-blue-200 shrink-0 w-8 text-right">{digestRunStatus.progress}%</span>
+                )}
               </div>
               {digestRunStatus.status === "running" && showLongWaitHint && (digestRunStatus.progress ?? 0) < 75 && (
                 <p className="mt-2 text-[10px] text-white/60">
