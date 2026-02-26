@@ -403,8 +403,13 @@ function DashboardContent() {
   const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
   const [addSourceTargetThemeId, setAddSourceTargetThemeId] = useState<string | null>(null);
   const [newSourceUrl, setNewSourceUrl] = useState("");
-  // 存储每个主题的自定义源
+  // 每个主题下用户新增的源（持久化在 settings.themeCustomSources）
   const [customThemeSources, setCustomThemeSources] = useState<Record<string, string[]>>({});
+  // 每个主题下用户从预设中移除的源（持久化在 settings.themeRemovedSources）
+  const [themeRemovedSources, setThemeRemovedSources] = useState<Record<string, string[]>>({});
+  // 当前展开管理源的主题卡（themeId），null 表示未展开
+  const [expandedThemeId, setExpandedThemeId] = useState<string | null>(null);
+  const [newRssUrlForTheme, setNewRssUrlForTheme] = useState("");
 
   // 立即发送简报：运行状态与轮询；digestSendingFrom 表示当前是哪张卡片在发送（仅该卡显示 loading）
   const [digestRunStatus, setDigestRunStatus] = useState<{ status: string; progress: number; message?: string } | null>(null);
@@ -430,6 +435,8 @@ function DashboardContent() {
         setSettings(settingsWithRss);
         // 初始化已订阅主题列表
         setSubscribedThemeIds(config.settings?.subscribedThemes || []);
+        setCustomThemeSources(config.settings?.themeCustomSources || {});
+        setThemeRemovedSources(config.settings?.themeRemovedSources || {});
         // 初始化弹窗配置
         setModalConfig({
           webhookUrl: config.settings?.webhookUrl || "",
@@ -538,6 +545,108 @@ function DashboardContent() {
       setShowToast(true);
       setTimeout(() => setShowToast(false), 2000);
     }
+  };
+
+  /** 获取某主题当前展示的源列表（预设 - 已移除 + 自定义） */
+  const getSourcesForTheme = (themeId: string): string[] => {
+    const theme = PRESET_THEMES.find((t) => t.id === themeId);
+    if (!theme) return [];
+    const removed = themeRemovedSources[themeId] || [];
+    const preset = theme.sources.filter((u) => !removed.includes(u));
+    const custom = customThemeSources[themeId] || [];
+    return [...preset, ...custom];
+  };
+
+  /** 清空自定义源（只保留各主题下的源） */
+  const handleClearCustomSources = async () => {
+    if (!confirm("确定要清空自定义源吗？将只保留各主题内的信源。")) return;
+    try {
+      const themeUrls = subscribedThemeIds.flatMap((id) => getSourcesForTheme(id));
+      const newRss = Array.from(new Set(themeUrls));
+      await persistRSS(newRss);
+      setSettings((prev: any) => ({ ...prev, rssUrls: newRss.join("\n") }));
+      setToastMsg("已清空自定义源");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 2000);
+    } catch (e) {
+      setToastMsg("操作失败，请重试");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 2000);
+    }
+  };
+
+  /** 从某主题中移除一条源（预设则记入 removed，自定义则从 custom 删）并持久化 */
+  const handleRemoveSourceFromTheme = async (themeId: string, url: string) => {
+    const theme = PRESET_THEMES.find((t) => t.id === themeId);
+    if (!theme) return;
+    const custom = customThemeSources[themeId] || [];
+    if (custom.includes(url)) {
+      const next = { ...customThemeSources, [themeId]: custom.filter((u) => u !== url) };
+      setCustomThemeSources(next);
+      const newSettings = { ...settings, themeCustomSources: next };
+      delete (newSettings as any).rssUrls;
+      await persistSettings(newSettings);
+      const full = buildFullRssListFromState(next, themeRemovedSources);
+      await persistRSS(full);
+      setSettings((prev: any) => ({ ...prev, rssUrls: full.join("\n") }));
+    } else {
+      const removed = themeRemovedSources[themeId] || [];
+      if (removed.includes(url)) return;
+      const next = { ...themeRemovedSources, [themeId]: [...removed, url] };
+      setThemeRemovedSources(next);
+      const newSettings = { ...settings, themeRemovedSources: next };
+      delete (newSettings as any).rssUrls;
+      await persistSettings(newSettings);
+      const full = buildFullRssListFromState(customThemeSources, next);
+      await persistRSS(full);
+      setSettings((prev: any) => ({ ...prev, rssUrls: full.join("\n") }));
+    }
+    setToastMsg("已移除该源");
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 1500);
+  };
+
+  /** 根据 custom + removed 计算完整 rss 列表（供 persist 用，不依赖 state） */
+  function buildFullRssListFromState(
+    custom: Record<string, string[]>,
+    removed: Record<string, string[]>
+  ): string[] {
+    const themeUrls = subscribedThemeIds.flatMap((id) => {
+      const t = PRESET_THEMES.find((x) => x.id === id);
+      if (!t) return [];
+      const r = removed[id] || [];
+      const preset = t.sources.filter((u) => !r.includes(u));
+      const add = custom[id] || [];
+      return [...preset, ...add];
+    });
+    const currentRss = settings.rssUrls ? settings.rssUrls.split("\n").filter((u: string) => u.trim()) : [];
+    const customOnly = currentRss.filter((u: string) => !themeUrls.includes(u));
+    return Array.from(new Set([...themeUrls, ...customOnly]));
+  }
+
+  /** 向某主题新增一条源并持久化 */
+  const handleAddSourceToTheme = async (themeId: string, url: string) => {
+    const u = url.trim();
+    if (!u) return;
+    const custom = customThemeSources[themeId] || [];
+    if (custom.includes(u)) {
+      setToastMsg("该源已存在");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 1500);
+      return;
+    }
+    const next = { ...customThemeSources, [themeId]: [...custom, u] };
+    setCustomThemeSources(next);
+    setNewRssUrlForTheme("");
+    const newSettings = { ...settings, themeCustomSources: next };
+    delete (newSettings as any).rssUrls;
+    await persistSettings(newSettings);
+    const full = buildFullRssListFromState(next, themeRemovedSources);
+    await persistRSS(full);
+    setSettings((prev: any) => ({ ...prev, rssUrls: full.join("\n") }));
+    setToastMsg("已添加源");
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 1500);
   };
 
   /** 立即发送：不传则用全部订阅；传则仅用该卡片的 RSS 源。cardKey 用于仅在该卡片上显示 loading */
@@ -1220,9 +1329,8 @@ function DashboardContent() {
                   {subscribedThemeIds.map((themeId) => {
                     const theme = PRESET_THEMES.find(t => t.id === themeId);
                     if (!theme) return null;
-                    
-                    const themeCustomSources = customThemeSources[themeId] || [];
-                    const allSources = [...theme.sources, ...themeCustomSources];
+                    const allSources = getSourcesForTheme(themeId);
+                    const isExpanded = expandedThemeId === themeId;
                     
                     return (
                       <div 
@@ -1246,38 +1354,85 @@ function DashboardContent() {
                             </button>
                           </div>
                           
-                          {/* 头部信息 */}
-                          <div className="flex items-center gap-4 mb-8">
+                          {/* 头部信息：点击展开/收起管理源 */}
+                          <div 
+                            className="flex items-center gap-4 mb-8 cursor-pointer"
+                            onClick={() => {
+                              setNewRssUrlForTheme("");
+                              setExpandedThemeId(isExpanded ? null : themeId);
+                            }}
+                          >
                             <div className="p-3.5 bg-white/10 rounded-2xl text-blue-600 border border-white/10 group-hover:bg-white group-hover:text-blue-950 transition-all duration-500">
                               {theme.icon}
                             </div>
-                            <h3 className="text-xl font-black text-white font-serif">{theme.title}</h3>
+                            <div className="flex-1">
+                              <h3 className="text-xl font-black text-white font-serif">{theme.title}</h3>
+                              <p className="text-[10px] text-blue-100/60 mt-0.5">{isExpanded ? "点击收起" : "点击管理本卡片 RSS 源"}</p>
+                            </div>
+                            <span className="text-blue-200/60">{isExpanded ? "−" : "+"}</span>
                           </div>
 
-                          {/* 差异化预览组件 */}
-                          <div className="mb-8">
-                            <ThemePreview theme={theme} />
-                          </div>
+                          {!isExpanded && (
+                            <>
+                              <div className="mb-8">
+                                <ThemePreview theme={theme} />
+                              </div>
+                              <p className="text-sm text-blue-100/80 font-medium leading-relaxed">
+                                {theme.desc}
+                              </p>
+                            </>
+                          )}
 
-                          <p className="text-sm text-blue-100/80 font-medium leading-relaxed">
-                            {theme.desc}
-                          </p>
-
-                          <div className="mt-8 pt-8 border-t border-white/10 space-y-4">
-                            <div className="flex items-center justify-between mb-4">
-                              <div className="flex items-center gap-2">
-                                <Rss className="w-4 h-4 text-blue-100/50" />
-                                <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">包含 {allSources.length} 个信源</span>
+                          {/* 展开：该卡片下的 RSS 列表，可删可增 */}
+                          {isExpanded && (
+                            <div className="mb-6 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">本卡片共 {allSources.length} 个信源</span>
+                              </div>
+                              <ul className="space-y-2 max-h-64 overflow-y-auto">
+                                {allSources.map((url, idx) => (
+                                  <li key={idx} className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-xl border border-white/5 text-[11px] text-blue-100/80 group/item">
+                                    <span className="truncate flex-1">{url}</span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleRemoveSourceFromTheme(themeId, url); }}
+                                      className="p-1.5 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover/item:opacity-100 transition-opacity"
+                                      title="移除该源"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                              <div className="flex gap-2 pt-2">
+                                <input
+                                  type="url"
+                                  value={expandedThemeId === themeId ? newRssUrlForTheme : ""}
+                                  onChange={(e) => setNewRssUrlForTheme(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === "Enter") handleAddSourceToTheme(themeId, newRssUrlForTheme); }}
+                                  placeholder="新增 RSS 地址"
+                                  className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/40"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddSourceToTheme(themeId, newRssUrlForTheme)}
+                                  className="px-4 py-2 rounded-xl bg-blue-500/80 text-white text-sm font-bold hover:bg-blue-500"
+                                >
+                                  新增
+                                </button>
                               </div>
                             </div>
-                            <div className="flex flex-wrap gap-2.5">
-                              {theme.sources.slice(0, 3).map((source: string, idx: number) => (
-                                <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-xl border border-white/5 text-[10px] text-blue-100/70 font-bold">
-                                  <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-br ${theme.color}`} />
-                                  <span className="truncate max-w-[120px] uppercase tracking-wider">{source.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}</span>
+                          )}
+
+                          <div className="mt-8 pt-8 border-t border-white/10 space-y-4">
+                            {!isExpanded && (
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                  <Rss className="w-4 h-4 text-blue-100/50" />
+                                  <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">包含 {allSources.length} 个信源</span>
                                 </div>
-                              ))}
-                            </div>
+                              </div>
+                            )}
                             <button
                               type="button"
                               onClick={() => handleTriggerDigest(allSources, theme.id)}
@@ -1352,11 +1507,7 @@ function DashboardContent() {
 
                   {/* 自定义 RSS 源（不属于任何主题的） */}
                   {(() => {
-                    const allThemesSources = subscribedThemeIds.flatMap(id => {
-                      const theme = PRESET_THEMES.find(t => t.id === id);
-                      if (!theme) return [];
-                      return [...theme.sources, ...(customThemeSources[id] || [])];
-                    });
+                    const allThemesSources = subscribedThemeIds.flatMap(id => getSourcesForTheme(id));
                     const customRssSources = settings.rssUrls
                       ? settings.rssUrls.split('\n').filter((url: string) => url && !allThemesSources.includes(url))
                       : [];
@@ -1366,14 +1517,25 @@ function DashboardContent() {
                     return (
                       <div className="break-inside-avoid relative flex flex-col">
                         <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-white/30 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5">
-                          <div className="flex items-center gap-4 mb-8">
-                            <div className="p-3.5 bg-white/10 rounded-2xl text-blue-300 border border-white/10 group-hover:bg-white group-hover:text-blue-950 transition-all duration-500">
-                              <Plus className="w-5 h-5" />
+                          <div className="flex items-center justify-between mb-8">
+                            <div className="flex items-center gap-4">
+                              <div className="p-3.5 bg-white/10 rounded-2xl text-blue-300 border border-white/10 group-hover:bg-white group-hover:text-blue-950 transition-all duration-500">
+                                <Plus className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <h3 className="text-xl font-black text-white font-serif">{settings.projectName?.trim() || "自定义源"}</h3>
+                                <p className="text-xs text-blue-100/80 font-bold uppercase tracking-widest mt-1">{customRssSources.length} 个信源</p>
+                              </div>
                             </div>
-                            <div>
-                              <h3 className="text-xl font-black text-white font-serif">{settings.projectName?.trim() || "自定义源"}</h3>
-                              <p className="text-xs text-blue-100/80 font-bold uppercase tracking-widest mt-1">{customRssSources.length} 个信源</p>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={handleClearCustomSources}
+                              className="p-2 rounded-lg text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                              title="清空自定义源"
+                              aria-label="清空自定义源"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                           
                           <div className="space-y-3">

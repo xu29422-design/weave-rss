@@ -20,6 +20,10 @@ export interface Settings {
   configMode?: 'simple' | 'pro'; // 配置模式
   subscribedThemes?: string[]; // 已订阅的主题ID列表
   superSubKeyword?: string; // 超级订阅关键词
+  /** 每个主题下用户新增的 RSS（themeId -> url[]） */
+  themeCustomSources?: Record<string, string[]>;
+  /** 每个主题下用户从预设中移除的 RSS（themeId -> url[]） */
+  themeRemovedSources?: Record<string, string[]>;
   // 推送渠道配置（全局配置池）
   pushChannels?: PushChannel[]; // 推送渠道列表（机器人、邮箱、轻维表）
 }
