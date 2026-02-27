@@ -23,12 +23,13 @@ async function getCurrentUserId(): Promise<string | null> {
  * 手动触发一次简报生成任务
  * @param rssUrls 可选。若传入则仅使用这些 RSS 源（针对当前卡片）；不传则使用用户全部订阅源
  */
-export async function triggerDigest(rssUrls?: string[]) {
+export async function triggerDigest(rssUrls?: string[], themeId?: string) {
   const userId = await getCurrentUserId();
   if (!userId) throw new Error("未登录");
 
-  const payload: { userId: string; rssUrls?: string[] } = { userId };
+  const payload: { userId: string; rssUrls?: string[]; themeId?: string } = { userId };
   if (rssUrls?.length) payload.rssUrls = rssUrls;
+  if (themeId) payload.themeId = themeId;
 
   await inngest.send({
     name: "digest/generate",

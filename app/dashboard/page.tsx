@@ -13,6 +13,12 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchCurrentConfig, persistSettings, persistRSS, triggerDigest } from "../config/actions";
 import { pushToAdminBot } from "../config/admin-actions";
+import { ANALYST_PROMPT, EDITOR_PROMPT, TLDR_PROMPT } from "../../lib/ai-prompts";
+
+// 用于界面展示的默认提示词（未自定义时显示，用户可查看或修改）
+const DEFAULT_ANALYST_DISPLAY = ANALYST_PROMPT.trim();
+const DEFAULT_EDITOR_DISPLAY = EDITOR_PROMPT("类别", 10).trim();
+const DEFAULT_TLDR_DISPLAY = TLDR_PROMPT.trim();
 
 // 类型定义
 type ThemeStyle = 'tech' | 'finance' | 'paper' | 'chat' | 'card' | 'minimal';
@@ -373,9 +379,27 @@ function DashboardContent() {
   const [activeTab, setActiveTab] = useState<"shelf" | "settings" | "active">("shelf");
   const [settings, setSettings] = useState<any>({});
   const [loading, setLoading] = useState(true);
+  const [promptTab, setPromptTab] = useState<'analyst' | 'editor' | 'tldr'>('analyst');
   const [thanksLoading, setThanksLoading] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState<any>(null);
   const [subscribedThemeIds, setSubscribedThemeIds] = useState<string[]>([]);
+  
+  // 配置中心模式
+  const [configMode, setConfigMode] = useState<'global' | 'flexible'>('global');
+  // 当前正在编辑独立配置的主题 ID
+  const [editingThemeConfigId, setEditingThemeConfigId] = useState<string | null>(null);
+  const [isThemeConfigModalOpen, setIsThemeConfigModalOpen] = useState(false);
+  const [editingThemeConfig, setEditingThemeConfig] = useState<any>({
+    webhookUrl: "",
+    aiProvider: "openai",
+    geminiApiKey: "",
+    openaiApiKey: "",
+    openaiBaseUrl: "",
+    openaiModel: "",
+    analystPrompt: "",
+    editorPrompt: "",
+    tldrPrompt: "",
+  });
 
   // 反馈弹窗状态
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
@@ -433,6 +457,17 @@ function DashboardContent() {
           rssUrls: config.rssSources ? config.rssSources.join("\n") : ""
         };
         setSettings(settingsWithRss);
+        setLastSavedSettings({
+          webhookUrl: settingsWithRss.webhookUrl ?? "",
+          aiProvider: settingsWithRss.aiProvider ?? "openai",
+          geminiApiKey: settingsWithRss.geminiApiKey ?? "",
+          openaiApiKey: settingsWithRss.openaiApiKey ?? "",
+          openaiBaseUrl: settingsWithRss.openaiBaseUrl ?? "",
+          openaiModel: settingsWithRss.openaiModel ?? "",
+          analystPrompt: settingsWithRss.analystPrompt ?? "",
+          editorPrompt: settingsWithRss.editorPrompt ?? "",
+          tldrPrompt: settingsWithRss.tldrPrompt ?? "",
+        });
         // 初始化已订阅主题列表
         setSubscribedThemeIds(config.settings?.subscribedThemes || []);
         setCustomThemeSources(config.settings?.themeCustomSources || {});
@@ -461,6 +496,303 @@ function DashboardContent() {
 
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
+  const [saveLoading, setSaveLoading] = useState<{ webhook: boolean; api: boolean; prompts: boolean }>({ webhook: false, api: false, prompts: false });
+
+  // 上次已保存的配置（用于判断是否有未保存修改）
+  const [lastSavedSettings, setLastSavedSettings] = useState<{
+    webhookUrl?: string; aiProvider?: string; geminiApiKey?: string; openaiApiKey?: string; openaiBaseUrl?: string; openaiModel?: string;
+    analystPrompt?: string; editorPrompt?: string; tldrPrompt?: string;
+  }>({});
+  // 未保存修改确认弹窗：离开时若有修改则询问保存或放弃
+  const [confirmUnsaved, setConfirmUnsaved] = useState<{
+    open: boolean;
+    message: string;
+    onSave: () => Promise<void>;
+    onDiscard: () => void;
+  }>({ open: false, message: "", onSave: async () => {}, onDiscard: () => {} });
+
+  const showSaveToast = (message: string) => {
+    setToastMsg(message);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 2000);
+  };
+
+  /** 切换配置模式后的提示：说明两种模式互斥及各自生效范围 */
+  const showModeSwitchTip = (newMode: "global" | "flexible") => {
+    const modeName = newMode === "flexible" ? "灵活配置模式" : "全局统一配置";
+    setToastMsg(`已切换至${modeName}。两种模式互斥：全局对所有卡片生效，灵活可对单卡单独配置。`);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 4500);
+  };
+
+  const handleSaveWebhook = async () => {
+    setSaveLoading((prev) => ({ ...prev, webhook: true }));
+    try {
+      await persistSettings(settings);
+      setLastSavedSettings((prev) => ({ ...prev, webhookUrl: settings.webhookUrl ?? "" }));
+      showSaveToast("Webhook 地址已保存");
+    } catch (error) {
+      console.error("Failed to save webhook:", error);
+      showSaveToast("保存失败，请重试");
+    } finally {
+      setSaveLoading((prev) => ({ ...prev, webhook: false }));
+    }
+  };
+
+  const handleSaveApi = async () => {
+    setSaveLoading((prev) => ({ ...prev, api: true }));
+    try {
+      const settingsToSave = { ...settings, aiProvider: "openai" };
+      await persistSettings(settingsToSave);
+      setSettings(settingsToSave);
+      setLastSavedSettings((prev) => ({
+        ...prev,
+        aiProvider: "openai",
+        geminiApiKey: "",
+        openaiApiKey: settingsToSave.openaiApiKey ?? "",
+        openaiBaseUrl: settingsToSave.openaiBaseUrl ?? "",
+        openaiModel: settingsToSave.openaiModel ?? "",
+      }));
+      showSaveToast("API 配置已保存");
+    } catch (error) {
+      console.error("Failed to save API:", error);
+      showSaveToast("保存失败，请重试");
+    } finally {
+      setSaveLoading((prev) => ({ ...prev, api: false }));
+    }
+  };
+
+  const handleSavePrompts = async () => {
+    setSaveLoading((prev) => ({ ...prev, prompts: true }));
+    try {
+      await persistSettings(settings);
+      setLastSavedSettings((prev) => ({
+        ...prev,
+        analystPrompt: settings.analystPrompt ?? "",
+        editorPrompt: settings.editorPrompt ?? "",
+        tldrPrompt: settings.tldrPrompt ?? "",
+      }));
+      showSaveToast("AI 提示词已保存");
+    } catch (error) {
+      console.error("Failed to save prompts:", error);
+      showSaveToast("保存失败，请重试");
+    } finally {
+      setSaveLoading((prev) => ({ ...prev, prompts: false }));
+    }
+  };
+
+  // 全局配置是否有未保存修改（用于显示保存按钮与离开确认）
+  const dirtyWebhook = (settings.webhookUrl ?? "") !== (lastSavedSettings.webhookUrl ?? "");
+  const dirtyApi =
+    (settings.aiProvider ?? "openai") !== (lastSavedSettings.aiProvider ?? "openai") ||
+    (settings.geminiApiKey ?? "") !== (lastSavedSettings.geminiApiKey ?? "") ||
+    (settings.openaiApiKey ?? "") !== (lastSavedSettings.openaiApiKey ?? "") ||
+    (settings.openaiBaseUrl ?? "") !== (lastSavedSettings.openaiBaseUrl ?? "") ||
+    (settings.openaiModel ?? "") !== (lastSavedSettings.openaiModel ?? "");
+  const dirtyPrompts =
+    (settings.analystPrompt ?? "") !== (lastSavedSettings.analystPrompt ?? "") ||
+    (settings.editorPrompt ?? "") !== (lastSavedSettings.editorPrompt ?? "") ||
+    (settings.tldrPrompt ?? "") !== (lastSavedSettings.tldrPrompt ?? "");
+  const hasAnyGlobalDirty = dirtyWebhook || dirtyApi || dirtyPrompts;
+
+  // 卡片独立配置弹窗内是否有未保存修改
+  const emptyThemeConfig = {
+    webhookUrl: "", aiProvider: "openai", geminiApiKey: "", openaiApiKey: "", openaiBaseUrl: "", openaiModel: "",
+    analystPrompt: "", editorPrompt: "", tldrPrompt: "",
+  };
+  const savedThemeConfig = editingThemeConfigId ? (settings.themeConfigs?.[editingThemeConfigId] || emptyThemeConfig) : null;
+  const themeConfigDirty = editingThemeConfigId && savedThemeConfig
+    ? (
+        (editingThemeConfig.webhookUrl ?? "") !== (savedThemeConfig.webhookUrl ?? "") ||
+        (editingThemeConfig.aiProvider ?? "openai") !== (savedThemeConfig.aiProvider ?? "openai") ||
+        (editingThemeConfig.geminiApiKey ?? "") !== (savedThemeConfig.geminiApiKey ?? "") ||
+        (editingThemeConfig.openaiApiKey ?? "") !== (savedThemeConfig.openaiApiKey ?? "") ||
+        (editingThemeConfig.openaiBaseUrl ?? "") !== (savedThemeConfig.openaiBaseUrl ?? "") ||
+        (editingThemeConfig.openaiModel ?? "") !== (savedThemeConfig.openaiModel ?? "") ||
+        (editingThemeConfig.analystPrompt ?? "") !== (savedThemeConfig.analystPrompt ?? "") ||
+        (editingThemeConfig.editorPrompt ?? "") !== (savedThemeConfig.editorPrompt ?? "") ||
+        (editingThemeConfig.tldrPrompt ?? "") !== (savedThemeConfig.tldrPrompt ?? "")
+      )
+    : false;
+
+  const revertGlobalSettings = () => {
+    setSettings((prev: any) => ({
+      ...prev,
+      webhookUrl: lastSavedSettings.webhookUrl ?? "",
+      aiProvider: lastSavedSettings.aiProvider ?? "openai",
+      geminiApiKey: lastSavedSettings.geminiApiKey ?? "",
+      openaiApiKey: lastSavedSettings.openaiApiKey ?? "",
+      openaiBaseUrl: lastSavedSettings.openaiBaseUrl ?? "",
+      openaiModel: lastSavedSettings.openaiModel ?? "",
+      analystPrompt: lastSavedSettings.analystPrompt ?? "",
+      editorPrompt: lastSavedSettings.editorPrompt ?? "",
+      tldrPrompt: lastSavedSettings.tldrPrompt ?? "",
+    }));
+  };
+
+  const handleSaveAllGlobal = async () => {
+    await persistSettings(settings);
+    setLastSavedSettings((prev) => ({
+      ...prev,
+      webhookUrl: settings.webhookUrl ?? "",
+      aiProvider: settings.aiProvider ?? "openai",
+      geminiApiKey: settings.geminiApiKey ?? "",
+      openaiApiKey: settings.openaiApiKey ?? "",
+      openaiBaseUrl: settings.openaiBaseUrl ?? "",
+      openaiModel: settings.openaiModel ?? "",
+      analystPrompt: settings.analystPrompt ?? "",
+      editorPrompt: settings.editorPrompt ?? "",
+      tldrPrompt: settings.tldrPrompt ?? "",
+    }));
+  };
+
+  const requestTabSwitch = (newTab: "shelf" | "settings" | "active") => {
+    if (activeTab === "settings" && hasAnyGlobalDirty) {
+      const labels: string[] = [];
+      if (dirtyWebhook) labels.push("Webhook 地址");
+      if (dirtyApi) labels.push("API 配置");
+      if (dirtyPrompts) labels.push("AI 提示词");
+      setConfirmUnsaved({
+        open: true,
+        message: `已进行${labels.join("、")}的修改，是否保存？执意不保存则之前的修改内容不会生效。`,
+        onSave: async () => {
+          await handleSaveAllGlobal();
+          showSaveToast("已保存");
+          setConfirmUnsaved((c) => ({ ...c, open: false }));
+          setActiveTab(newTab);
+        },
+        onDiscard: () => {
+          revertGlobalSettings();
+          setConfirmUnsaved((c) => ({ ...c, open: false }));
+          setActiveTab(newTab);
+        },
+      });
+    } else {
+      setActiveTab(newTab);
+    }
+  };
+
+  const requestConfigModeSwitch = (newMode: "global" | "flexible") => {
+    if (hasAnyGlobalDirty) {
+      const labels: string[] = [];
+      if (dirtyWebhook) labels.push("Webhook 地址");
+      if (dirtyApi) labels.push("API 配置");
+      if (dirtyPrompts) labels.push("AI 提示词");
+      setConfirmUnsaved({
+        open: true,
+        message: `已进行${labels.join("、")}的修改，是否保存？执意不保存则之前的修改内容不会生效。`,
+        onSave: async () => {
+          await handleSaveAllGlobal();
+          showSaveToast("已保存");
+          setConfirmUnsaved((c) => ({ ...c, open: false }));
+          setConfigMode(newMode);
+          setTimeout(() => showModeSwitchTip(newMode), 2100);
+        },
+        onDiscard: () => {
+          revertGlobalSettings();
+          setConfirmUnsaved((c) => ({ ...c, open: false }));
+          setConfigMode(newMode);
+          showModeSwitchTip(newMode);
+        },
+      });
+    } else {
+      setConfigMode(newMode);
+      showModeSwitchTip(newMode);
+    }
+  };
+
+  const requestThemeModalClose = () => {
+    if (themeConfigDirty) {
+      setConfirmUnsaved({
+        open: true,
+        message: "已进行卡片独立配置的修改，是否保存？执意不保存则之前的修改内容不会生效。",
+        onSave: async () => {
+          await handleSaveThemeConfig();
+          setConfirmUnsaved((c) => ({ ...c, open: false }));
+        },
+        onDiscard: () => {
+          setConfirmUnsaved((c) => ({ ...c, open: false }));
+          setIsThemeConfigModalOpen(false);
+        },
+      });
+    } else {
+      setIsThemeConfigModalOpen(false);
+    }
+  };
+
+  // --- 按卡片独立配置相关逻辑 ---
+  const handleOpenThemeConfigModal = (themeId: string) => {
+    setEditingThemeConfigId(themeId);
+    const existingConfig = settings.themeConfigs?.[themeId];
+    if (existingConfig) {
+      setEditingThemeConfig({
+        webhookUrl: existingConfig.webhookUrl || "",
+        aiProvider: existingConfig.aiProvider || "openai",
+        geminiApiKey: existingConfig.geminiApiKey || "",
+        openaiApiKey: existingConfig.openaiApiKey || "",
+        openaiBaseUrl: existingConfig.openaiBaseUrl || "",
+        openaiModel: existingConfig.openaiModel || "",
+        analystPrompt: existingConfig.analystPrompt || "",
+        editorPrompt: existingConfig.editorPrompt || "",
+        tldrPrompt: existingConfig.tldrPrompt || "",
+      });
+    } else {
+      setEditingThemeConfig({
+        webhookUrl: "",
+        aiProvider: "openai",
+        geminiApiKey: "",
+        openaiApiKey: "",
+        openaiBaseUrl: "",
+        openaiModel: "",
+        analystPrompt: "",
+        editorPrompt: "",
+        tldrPrompt: "",
+      });
+    }
+    setIsThemeConfigModalOpen(true);
+  };
+
+  const handleSaveThemeConfig = async () => {
+    if (!editingThemeConfigId) return;
+    
+    setSaveLoading((prev) => ({ ...prev, prompts: true })); // 复用 loading 状态
+    try {
+      const currentThemeConfigs = settings.themeConfigs || {};
+      const newThemeConfigs = {
+        ...currentThemeConfigs,
+        [editingThemeConfigId]: editingThemeConfig
+      };
+
+      const newSettings = { ...settings, themeConfigs: newThemeConfigs };
+      await persistSettings(newSettings);
+      setSettings(newSettings);
+      showSaveToast("卡片独立配置保存成功");
+      setIsThemeConfigModalOpen(false);
+    } catch (error) {
+      console.error("Failed to save theme config:", error);
+      showSaveToast("保存失败，请重试");
+    } finally {
+      setSaveLoading((prev) => ({ ...prev, prompts: false }));
+    }
+  };
+
+  const handleDeleteThemeConfig = async (themeId: string) => {
+    if (!confirm("确定要删除该卡片的独立配置，恢复使用全局配置吗？")) return;
+    try {
+      const currentThemeConfigs = settings.themeConfigs || {};
+      const newThemeConfigs = { ...currentThemeConfigs };
+      delete newThemeConfigs[themeId];
+      
+      const newSettings = { ...settings, themeConfigs: newThemeConfigs };
+      await persistSettings(newSettings);
+      setSettings(newSettings);
+      showSaveToast("已恢复全局配置");
+    } catch (error) {
+      console.error("Failed to delete theme config:", error);
+      showSaveToast("删除失败，请重试");
+    }
+  };
+  // ---------------------------------
 
   const handleThanks = async () => {
     // 预设免费 API 配置
@@ -496,17 +828,6 @@ function DashboardContent() {
       setTimeout(() => setShowToast(false), 3000);
     } finally {
       setThanksLoading(false);
-    }
-  };
-
-  const handleSaveSettings = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await persistSettings(settings);
-      alert("个人中心配置已保存！");
-    } catch (error) {
-      console.error("Failed to save settings:", error);
-      alert("保存失败，请重试。");
     }
   };
 
@@ -657,7 +978,7 @@ function DashboardContent() {
     setDigestRunStartAt(Date.now());
     setDigestRunStatus({ status: "running", progress: 0, message: "正在提交…" });
     try {
-      await triggerDigest(cardRssUrls?.length ? cardRssUrls : undefined);
+      await triggerDigest(cardRssUrls?.length ? cardRssUrls : undefined, cardKey);
     } catch (e) {
       setDigestSending(false);
       setDigestSendingFrom(null);
@@ -894,9 +1215,9 @@ function DashboardContent() {
         </div>
         <div className="flex items-center gap-6">
           <nav className="hidden md:flex items-center bg-white/10 p-1 rounded-2xl border border-white/10 backdrop-blur-sm">
-          <button onClick={() => setActiveTab('shelf')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'shelf' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/80 hover:text-white'}`}>主题货架</button>
-          <button onClick={() => setActiveTab('active')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'active' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/80 hover:text-white'}`}>已订阅</button>
-          <button onClick={() => setActiveTab('settings')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'settings' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/80 hover:text-white'}`}>个人中心</button>
+          <button onClick={() => requestTabSwitch('shelf')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'shelf' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/80 hover:text-white'}`}>主题货架</button>
+          <button onClick={() => requestTabSwitch('active')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'active' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/80 hover:text-white'}`}>已订阅</button>
+          <button onClick={() => requestTabSwitch('settings')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'settings' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/80 hover:text-white'}`}>配置中心</button>
           </nav>
           <div className="h-8 w-px bg-white/10 mx-2" />
           <div className="flex items-center gap-3">
@@ -912,6 +1233,174 @@ function DashboardContent() {
       </header>
 
       <main className="max-w-7xl mx-auto p-8 lg:p-12 relative z-10">
+
+        <AnimatePresence>
+          {isThemeConfigModalOpen && editingThemeConfigId && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+              onClick={() => requestThemeModalClose()}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                className="bg-[#0f172a] border border-white/10 rounded-[40px] w-full max-w-2xl shadow-2xl overflow-hidden ring-1 ring-white/5 max-h-[90vh] flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-8 border-b border-white/10 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-white/10 rounded-2xl text-blue-400 border border-white/10">
+                      <Settings2 className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-white font-serif">独立配置</h3>
+                      <p className="text-xs text-white/50 font-bold mt-1 uppercase tracking-widest">
+                        主题：{PRESET_THEMES.find(t => t.id === editingThemeConfigId)?.title}
+                      </p>
+                    </div>
+                  </div>
+                  <button onClick={() => requestThemeModalClose()} className="p-3 bg-white/5 rounded-full hover:bg-white/10 transition-colors border border-white/10">
+                    <X className="w-5 h-5 text-white/50" />
+                  </button>
+                </div>
+
+                <div className="p-8 overflow-y-auto space-y-8">
+                  {/* Webhook */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-blue-400" /> Webhook 地址
+                    </h4>
+                    <input 
+                      type="text" 
+                      value={editingThemeConfig.webhookUrl} 
+                      onChange={(e) => setEditingThemeConfig({...editingThemeConfig, webhookUrl: e.target.value})}
+                      placeholder="留空则使用全局配置"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-white placeholder:text-white/30"
+                    />
+                  </div>
+
+                  {/* API */}
+                  <div className="space-y-6 pt-6 border-t border-white/10">
+                    <h4 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-blue-400" /> API 配置
+                    </h4>
+                    <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10">
+                      <button type="button" onClick={() => setEditingThemeConfig({...editingThemeConfig, aiProvider: 'google'})} className={`flex-1 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${editingThemeConfig.aiProvider === 'google' ? 'bg-blue-500 text-white shadow-lg' : 'text-white/40 hover:text-white'}`}>Google Gemini</button>
+                      <button type="button" onClick={() => setEditingThemeConfig({...editingThemeConfig, aiProvider: 'openai'})} className={`flex-1 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${editingThemeConfig.aiProvider === 'openai' ? 'bg-blue-500 text-white shadow-lg' : 'text-white/40 hover:text-white'}`}>OpenAI / 兼容平台</button>
+                    </div>
+
+                    {editingThemeConfig.aiProvider === 'google' ? (
+                      <div>
+                        <input 
+                          type="password" 
+                          value={editingThemeConfig.geminiApiKey} 
+                          onChange={(e) => setEditingThemeConfig({...editingThemeConfig, geminiApiKey: e.target.value})}
+                          placeholder="Gemini API Key (留空则使用全局配置)"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-white placeholder:text-white/30"
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <input 
+                          type="password" 
+                          value={editingThemeConfig.openaiApiKey} 
+                          onChange={(e) => setEditingThemeConfig({...editingThemeConfig, openaiApiKey: e.target.value})}
+                          placeholder="OpenAI API Key (留空则使用全局配置)"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-white placeholder:text-white/30"
+                        />
+                        <div className="grid grid-cols-2 gap-4">
+                          <input 
+                            type="text" 
+                            value={editingThemeConfig.openaiBaseUrl} 
+                            onChange={(e) => setEditingThemeConfig({...editingThemeConfig, openaiBaseUrl: e.target.value})}
+                            placeholder="Base URL (留空使用全局)"
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-white placeholder:text-white/30"
+                          />
+                          <input 
+                            type="text" 
+                            value={editingThemeConfig.openaiModel} 
+                            onChange={(e) => setEditingThemeConfig({...editingThemeConfig, openaiModel: e.target.value})}
+                            placeholder="Model Name (留空使用全局)"
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-white placeholder:text-white/30"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Prompts */}
+                  <div className="space-y-4 pt-6 border-t border-white/10">
+                    <h4 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+                      <BrainCircuit className="w-4 h-4 text-blue-400" /> AI 提示词
+                    </h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest ml-1 mb-1 block">分析阶段 (Analyst)</label>
+                        <textarea 
+                          rows={3} 
+                          value={editingThemeConfig.analystPrompt} 
+                          onChange={(e) => setEditingThemeConfig({...editingThemeConfig, analystPrompt: e.target.value})} 
+                          placeholder="留空则使用全局配置..."
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-xs font-sans focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none text-white placeholder:text-white/30" 
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest ml-1 mb-1 block">汇总阶段 (Editor)</label>
+                        <textarea 
+                          rows={3} 
+                          value={editingThemeConfig.editorPrompt} 
+                          onChange={(e) => setEditingThemeConfig({...editingThemeConfig, editorPrompt: e.target.value})} 
+                          placeholder="留空则使用全局配置..."
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-xs font-sans focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none text-white placeholder:text-white/30" 
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest ml-1 mb-1 block">今日焦点 (TL;DR)</label>
+                        <textarea 
+                          rows={3} 
+                          value={editingThemeConfig.tldrPrompt} 
+                          onChange={(e) => setEditingThemeConfig({...editingThemeConfig, tldrPrompt: e.target.value})} 
+                          placeholder="留空则使用全局配置..."
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-xs font-sans focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none text-white placeholder:text-white/30" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-8 border-t border-white/10 shrink-0 flex items-center justify-between bg-white/5">
+                  {settings.themeConfigs?.[editingThemeConfigId] ? (
+                    <button 
+                      onClick={() => handleDeleteThemeConfig(editingThemeConfigId)}
+                      className="px-6 py-3 bg-red-500/10 text-red-400 rounded-xl font-bold text-sm hover:bg-red-500/20 transition-all flex items-center gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" /> 删除独立配置
+                    </button>
+                  ) : (
+                    <div />
+                  )}
+                  <div className="flex gap-4">
+                    <button 
+                      onClick={() => requestThemeModalClose()}
+                      className="px-6 py-3 bg-white/10 text-white rounded-xl font-bold text-sm hover:bg-white/20 transition-all"
+                    >
+                      取消
+                    </button>
+                    {themeConfigDirty && (
+                      <button 
+                        onClick={handleSaveThemeConfig}
+                        disabled={saveLoading.prompts}
+                        className="px-8 py-3 bg-blue-500 text-white rounded-xl font-bold text-sm hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-60 flex items-center gap-2"
+                      >
+                        {saveLoading.prompts ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                        保存独立配置
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <AnimatePresence>
           {isModalOpen && selectedTheme && (
@@ -1263,21 +1752,9 @@ function DashboardContent() {
                       </p>
 
                       <div className="mt-8 pt-8 border-t border-white/10">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-2">
-                            <Rss className="w-4 h-4 text-blue-100/50" />
-                            <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">包含 {theme.sources.length + (customThemeSources[theme.id]?.length || 0)} 个信源</span>
-                          </div>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openAddSourceModal(theme.id);
-                            }}
-                            className="flex items-center gap-1.5 text-[10px] font-black text-blue-300 hover:text-blue-200 bg-blue-500/20 px-3 py-1.5 rounded-xl transition-colors uppercase tracking-widest"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            添加源
-                          </button>
+                        <div className="flex items-center gap-2 mb-4">
+                          <Rss className="w-4 h-4 text-blue-100/50" />
+                          <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">包含 {theme.sources.length + (customThemeSources[theme.id]?.length || 0)} 个信源</span>
                         </div>
                         <div className="flex flex-wrap gap-2.5">
                           {theme.sources.slice(0, 3).map((source: string, idx: number) => (
@@ -1316,12 +1793,7 @@ function DashboardContent() {
               key="active" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
               className="space-y-12"
             >
-              <div className="flex items-center justify-between">
-                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">已订阅主题</h2>
-                <button onClick={() => router.push("/config")} className="flex items-center gap-3 text-blue-600 font-black text-sm uppercase tracking-[0.2em] hover:text-blue-700 transition-colors group">
-                  新增自定义配置 <Settings2 className="w-5 h-5 group-hover:rotate-90 transition-transform duration-500" />
-                </button>
-              </div>
+              <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">已订阅主题</h2>
 
               {subscribedThemeIds.length > 0 || settings.rssUrls || settings.superSubKeyword ? (
                 <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
@@ -1337,15 +1809,28 @@ function DashboardContent() {
                         key={themeId}
                         className="break-inside-avoid group relative flex flex-col"
                       >
-                        <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-blue-500/20 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5">
-                          {/* 已订阅标签 + 取消订阅 */}
+                        <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-blue-500/20 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5 overflow-hidden">
+                          {/* 左上角绿色微光表示已订阅 */}
+                          <div className="absolute -top-8 -left-8 w-24 h-24 rounded-full bg-green-500/25 blur-2xl pointer-events-none" aria-hidden />
+                          
+                          {/* 右上角：新增源（内嵌加号/减号，点击展开或收起）+ 取消订阅 */}
                           <div className="absolute top-6 right-6 flex items-center gap-2">
-                            <span className="px-4 py-1.5 bg-green-500/20 text-green-300 text-[10px] font-black rounded-full border border-green-500/30 uppercase tracking-widest">
-                              已订阅
-                            </span>
                             <button
                               type="button"
-                              onClick={() => handleUnsubscribeTheme(themeId)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setNewRssUrlForTheme("");
+                                setExpandedThemeId(isExpanded ? null : themeId);
+                              }}
+                              className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest text-green-300 bg-green-500/20 border border-green-500/40 hover:bg-green-500/30 hover:border-green-400/50 transition-all shadow-[0_0_12px_rgba(34,197,94,0.25)]"
+                              title={isExpanded ? "收起" : "展开管理 RSS 源"}
+                            >
+                              新增源
+                              {isExpanded ? <span className="text-sm font-light leading-none">−</span> : <Plus className="w-3.5 h-3.5" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleUnsubscribeTheme(themeId); }}
                               className="p-2 rounded-lg text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                               title="取消订阅"
                               aria-label="取消订阅"
@@ -1354,22 +1839,15 @@ function DashboardContent() {
                             </button>
                           </div>
                           
-                          {/* 头部信息：点击展开/收起管理源 */}
-                          <div 
-                            className="flex items-center gap-4 mb-8 cursor-pointer"
-                            onClick={() => {
-                              setNewRssUrlForTheme("");
-                              setExpandedThemeId(isExpanded ? null : themeId);
-                            }}
-                          >
+                          {/* 头部信息（不再整行点击展开/收起） */}
+                          <div className="flex items-center gap-4 mb-8">
                             <div className="p-3.5 bg-white/10 rounded-2xl text-blue-600 border border-white/10 group-hover:bg-white group-hover:text-blue-950 transition-all duration-500">
                               {theme.icon}
                             </div>
                             <div className="flex-1">
                               <h3 className="text-xl font-black text-white font-serif">{theme.title}</h3>
-                              <p className="text-[10px] text-blue-100/60 mt-0.5">{isExpanded ? "点击收起" : "点击管理本卡片 RSS 源"}</p>
+                              <p className="text-[10px] text-blue-100/60 mt-0.5">{isExpanded ? "点击「新增源」收起" : "点击「新增源」管理本卡片 RSS 源"}</p>
                             </div>
-                            <span className="text-blue-200/60">{isExpanded ? "−" : "+"}</span>
                           </div>
 
                           {!isExpanded && (
@@ -1580,80 +2058,87 @@ function DashboardContent() {
               key="settings" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
               className="max-w-3xl mx-auto space-y-12"
             >
-              <div className="flex items-center justify-between">
-                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">个人中心</h2>
-                <button 
-                  onClick={() => document.getElementById('settings-form')?.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }))}
-                  className="px-8 py-3 bg-white text-blue-950 rounded-full font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-white/10"
+              <div className="flex items-center justify-between gap-6 flex-wrap">
+                <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">配置中心</h2>
+                {/* 右侧：当前为全局时显示「灵活配置」按钮，当前为灵活时显示「全局统一配置」按钮；点击后切换并提示互斥与生效范围 */}
+                <button
+                  type="button"
+                  onClick={() => requestConfigModeSwitch(configMode === "global" ? "flexible" : "global")}
+                  className="px-6 py-3 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 text-sm font-black uppercase tracking-widest text-white transition-all shadow-inner backdrop-blur-sm"
                 >
-                  保存设置
+                  {configMode === "global" ? "灵活配置" : "全局统一配置"}
                 </button>
               </div>
+
+              {configMode === 'global' ? (
+                <p className="text-sm text-white/60 leading-relaxed">
+                  以下为<strong className="text-white/80">全局统一配置</strong>，适用于所有已订阅的主题卡片。如需为某张卡片单独设置 Webhook、API 或 AI 提示词，请点击右侧「<strong className="text-white/80">灵活配置</strong>」按钮切换为灵活配置模式，再点击对应卡片进行配置。
+                </p>
+              ) : (
+                <p className="text-sm text-white/60 leading-relaxed">
+                  当前为<strong className="text-white/80">灵活配置模式</strong>。点击下方卡片可为其配置独立的 Webhook、API 和 AI 提示词；未独立配置的卡片将默认使用全局统一配置。点击右侧「<strong className="text-white/80">全局统一配置</strong>」按钮可返回全局模式。
+                </p>
+              )}
               
-              <form id="settings-form" onSubmit={handleSaveSettings} className="space-y-10">
-                {/* Webhook 配置 */}
-                <div className="bg-white/10 rounded-[40px] border border-white/10 p-10 shadow-2xl backdrop-blur-md ring-1 ring-white/5 space-y-8">
-                  <div className="flex items-center gap-5">
-                    <div className="p-4 bg-white/10 rounded-2xl text-blue-300 border border-white/10"><Bell className="w-7 h-7" /></div>
-                    <h3 className="text-2xl font-black text-white font-serif">输入推送的机器人地址</h3>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-xs font-black text-white uppercase tracking-widest ml-1 mb-3 block">Webhook 地址</label>
-                      <input 
-                        type="text" 
-                        value={settings.webhookUrl || ""} 
-                        onChange={(e) => setSettings({...settings, webhookUrl: e.target.value})}
-                        placeholder="请输入机器人 Webhook 地址"
-                        className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-base outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/30"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* API 状态 */}
-                <div className="bg-white/10 rounded-[40px] border border-white/10 p-10 shadow-2xl backdrop-blur-md ring-1 ring-white/5 space-y-8">
-                    <div className="flex items-center justify-between">
+              <div className="space-y-10">
+                {configMode === 'global' ? (
+                  <div className="space-y-10 animate-in fade-in duration-500">
+                    {/* Webhook 配置 */}
+                    <div className="bg-white/10 rounded-[40px] border border-white/10 p-10 shadow-2xl backdrop-blur-md ring-1 ring-white/5 space-y-8">
                       <div className="flex items-center gap-5">
-                        <div className="p-4 bg-white/10 rounded-2xl text-blue-300 border border-white/10"><Zap className="w-7 h-7" /></div>
-                        <h3 className="text-2xl font-black text-white font-serif">配置你的AI-APIkey</h3>
+                        <div className="p-4 bg-white/10 rounded-2xl text-blue-300 border border-white/10"><Bell className="w-7 h-7" /></div>
+                        <h3 className="text-2xl font-black text-white font-serif">输入推送的机器人地址</h3>
                       </div>
-                      <button 
-                        type="button"
-                        onClick={handleThanks} disabled={thanksLoading}
-                        className="px-5 py-2.5 bg-blue-500/20 text-blue-300 rounded-xl font-black text-[10px] hover:bg-blue-500/30 transition-all flex items-center gap-2 border border-blue-500/30 uppercase tracking-widest"
-                      >
-                        {thanksLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Heart className="w-3.5 h-3.5 fill-current" />}
-                        使用免费 API (感谢阿旭)
-                      </button>
-                    </div>
-
-                  <div className="space-y-6">
-                    <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/5">
-                      <button type="button" onClick={() => setSettings({...settings, aiProvider: 'google'})} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${settings.aiProvider === 'google' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/40 hover:text-white'}`}>Google Gemini</button>
-                      <button type="button" onClick={() => setSettings({...settings, aiProvider: 'openai'})} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${settings.aiProvider === 'openai' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/40 hover:text-white'}`}>OpenAI / 兼容平台</button>
-                    </div>
-
-                    {settings.aiProvider === 'google' ? (
-                      <div className="animate-in fade-in duration-500">
-                        <label className="text-xs font-black text-white uppercase tracking-widest ml-1 mb-3 block">Gemini API Key</label>
-                        <input 
-                          type="password" 
-                          value={settings.geminiApiKey || ""} 
-                          onChange={(e) => setSettings({...settings, geminiApiKey: e.target.value})}
-                          placeholder="输入apikey"
-                          className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-base outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/50"
-                        />
-                      </div>
-                    ) : (
-                      <div className="space-y-6 animate-in fade-in duration-500">
+                      <div className="space-y-4">
                         <div>
-                          <label className="text-xs font-black text-white uppercase tracking-widest ml-1 mb-3 block">OpenAI API Key</label>
+                          <label className="text-xs font-black text-white uppercase tracking-widest ml-1 mb-3 block">Webhook 地址</label>
+                          <input 
+                            type="text" 
+                            value={settings.webhookUrl || ""} 
+                            onChange={(e) => setSettings({...settings, webhookUrl: e.target.value})}
+                            placeholder="请输入机器人 Webhook 地址"
+                            className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-base outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/30"
+                          />
+                        </div>
+                      </div>
+                      {dirtyWebhook && (
+                        <div className="pt-2">
+                          <button type="button" onClick={handleSaveWebhook} disabled={saveLoading.webhook} className="px-8 py-3 bg-white text-blue-950 rounded-full font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-white/10 disabled:opacity-60 flex items-center gap-2">
+                            {saveLoading.webhook ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                            保存
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* API 状态：仅展示兼容 OpenAI API 的平台配置 */}
+                    <div className="bg-white/10 rounded-[40px] border border-white/10 p-10 shadow-2xl backdrop-blur-md ring-1 ring-white/5 space-y-8">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-5">
+                            <div className="p-4 bg-white/10 rounded-2xl text-blue-300 border border-white/10"><Zap className="w-7 h-7" /></div>
+                            <h3 className="text-2xl font-black text-white font-serif">配置你的AI-APIkey</h3>
+                          </div>
+                          <button 
+                            type="button"
+                            onClick={handleThanks} disabled={thanksLoading}
+                            className="px-5 py-2.5 bg-blue-500/20 text-blue-300 rounded-xl font-black text-[10px] hover:bg-blue-500/30 transition-all flex items-center gap-2 border border-blue-500/30 uppercase tracking-widest"
+                          >
+                            {thanksLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Heart className="w-3.5 h-3.5 fill-current" />}
+                            使用免费 API (感谢阿旭)
+                          </button>
+                        </div>
+
+                      <p className="text-xs text-white/50">支持 OpenAI 及兼容其 API 的第三方服务（如国内大模型平台），填写 API Key、Base URL 与模型名即可。</p>
+
+                      <div className="space-y-6">
+                        <div>
+                          <label className="text-xs font-black text-white uppercase tracking-widest ml-1 mb-3 block">API Key</label>
                           <input 
                             type="password" 
                             value={settings.openaiApiKey || ""} 
                             onChange={(e) => setSettings({...settings, openaiApiKey: e.target.value})}
-                            className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-base outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white"
+                            placeholder="输入 API Key"
+                            className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-base outline-none focus:ring-2 focus:ring-blue-400 transition-all font-sans text-white placeholder:text-white/50"
                           />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1679,13 +2164,155 @@ function DashboardContent() {
                           </div>
                         </div>
                       </div>
-                    )}
+                      {dirtyApi && (
+                        <div className="pt-2">
+                          <button type="button" onClick={handleSaveApi} disabled={saveLoading.api} className="px-8 py-3 bg-white text-blue-950 rounded-full font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-white/10 disabled:opacity-60 flex items-center gap-2">
+                            {saveLoading.api ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                            保存
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 高级设置 - AI 提示词配置 */}
+                    <div className="bg-white/10 rounded-[40px] border border-white/10 p-10 shadow-2xl backdrop-blur-md ring-1 ring-white/5 space-y-8">
+                      <div className="flex items-center gap-5">
+                        <div className="p-4 bg-white/10 rounded-2xl text-blue-300 border border-white/10"><BrainCircuit className="w-7 h-7" /></div>
+                        <h3 className="text-2xl font-black text-white font-serif">自定义 AI 提示词</h3>
+                      </div>
+                      <div className="space-y-6">
+                        <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/5">
+                          <button type="button" onClick={() => setPromptTab('analyst')} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${promptTab === 'analyst' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/40 hover:text-white'}`}>分析阶段</button>
+                          <button type="button" onClick={() => setPromptTab('editor')} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${promptTab === 'editor' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/40 hover:text-white'}`}>汇总阶段</button>
+                          <button type="button" onClick={() => setPromptTab('tldr')} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${promptTab === 'tldr' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/40 hover:text-white'}`}>今日焦点</button>
+                        </div>
+                        <div className="animate-in fade-in duration-500">
+                          {promptTab === 'analyst' && (
+                            <p className="text-xs text-white/50 mb-2">分析阶段：AI 对每条抓取的新闻进行解析与分类，提炼核心内容、打标签并评分，输出结构化结果供后续汇总使用。</p>
+                          )}
+                          {promptTab === 'editor' && (
+                            <p className="text-xs text-white/50 mb-2">汇总阶段：AI 根据已分类的多条新闻，按主题或赛道分组撰写「今日动态」，生成带链接的 Markdown 简报正文。</p>
+                          )}
+                          {promptTab === 'tldr' && (
+                            <p className="text-xs text-white/50 mb-2">今日焦点：AI 从当日全部动态中提炼最值得关注的 1～3 件事，用简短「今日焦点」呈现，便于快速浏览。</p>
+                          )}
+                          <textarea 
+                            name={promptTab === 'analyst' ? 'analystPrompt' : promptTab === 'editor' ? 'editorPrompt' : 'tldrPrompt'} 
+                            rows={12} 
+                            value={promptTab === 'analyst' ? (settings.analystPrompt !== undefined && settings.analystPrompt !== "" ? settings.analystPrompt : DEFAULT_ANALYST_DISPLAY) : promptTab === 'editor' ? (settings.editorPrompt !== undefined && settings.editorPrompt !== "" ? settings.editorPrompt : DEFAULT_EDITOR_DISPLAY) : (settings.tldrPrompt !== undefined && settings.tldrPrompt !== "" ? settings.tldrPrompt : DEFAULT_TLDR_DISPLAY)} 
+                            onChange={(e) => {
+                              if (promptTab === 'analyst') setSettings({...settings, analystPrompt: e.target.value});
+                              else if (promptTab === 'editor') setSettings({...settings, editorPrompt: e.target.value});
+                              else setSettings({...settings, tldrPrompt: e.target.value});
+                            }} 
+                            placeholder=""
+                            className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-sm font-sans focus:ring-2 focus:ring-blue-400 outline-none transition-all resize-none text-white placeholder:text-white/30" 
+                          />
+                        </div>
+                      </div>
+                      {dirtyPrompts && (
+                        <div className="pt-2">
+                          <button type="button" onClick={handleSavePrompts} disabled={saveLoading.prompts} className="px-8 py-3 bg-white text-blue-950 rounded-full font-black text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-white/10 disabled:opacity-60 flex items-center gap-2">
+                            {saveLoading.prompts ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                            保存
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                ) : (
+                  <div className="space-y-8 animate-in fade-in duration-500">
+                    <div className="bg-white/5 rounded-3xl p-8 border border-white/10">
+                      <h3 className="text-xl font-black text-white mb-2">已订阅主题卡片</h3>
+                      <p className="text-sm text-white/50 mb-8">点击卡片可为其配置独立的 Webhook、API 和 AI 提示词。未独立配置的卡片将默认使用全局统一配置。</p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {subscribedThemeIds.length === 0 ? (
+                          <div className="col-span-full py-12 text-center border-2 border-dashed border-white/10 rounded-2xl">
+                            <p className="text-white/40 font-bold text-sm">暂无订阅卡片，请先前往主题货架订阅</p>
+                          </div>
+                        ) : (
+                          subscribedThemeIds.map(themeId => {
+                            const theme = PRESET_THEMES.find(t => t.id === themeId);
+                            if (!theme) return null;
+                            const hasCustomConfig = !!settings.themeConfigs?.[themeId];
+                            
+                            return (
+                              <div 
+                                key={themeId}
+                                onClick={() => handleOpenThemeConfigModal(themeId)}
+                                className={`group cursor-pointer relative overflow-hidden rounded-2xl p-5 border transition-all duration-300 ${hasCustomConfig ? 'bg-blue-500/10 border-blue-500/30 hover:border-blue-400/50' : 'bg-white/5 border-white/10 hover:border-white/30 hover:bg-white/10'}`}
+                              >
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className={`p-2 rounded-xl ${hasCustomConfig ? 'bg-blue-500/20 text-blue-300' : 'bg-white/10 text-white/70'}`}>
+                                      {theme.icon}
+                                    </div>
+                                    <h4 className="font-bold text-white text-lg">{theme.title}</h4>
+                                  </div>
+                                  {hasCustomConfig && (
+                                    <span className="px-2 py-1 bg-blue-500 text-white text-[10px] font-black rounded-md uppercase tracking-widest">已独立配置</span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-white/50 line-clamp-1">{theme.desc}</p>
+                                
+                                {/* Hover 提示 */}
+                                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                                  <span className="text-white font-bold text-sm flex items-center gap-2">
+                                    <Settings2 className="w-4 h-4" /> {hasCustomConfig ? '修改独立配置' : '开启独立配置'}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 未保存修改确认弹窗 */}
+        <AnimatePresence>
+          {confirmUnsaved.open && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-[#0f172a] border border-white/20 rounded-3xl shadow-2xl max-w-md w-full p-8 space-y-6"
+              >
+                <p className="text-white font-medium leading-relaxed">{confirmUnsaved.message}</p>
+                <div className="flex gap-4 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      confirmUnsaved.onDiscard();
+                    }}
+                    className="px-6 py-3 bg-white/10 text-white rounded-xl font-bold text-sm hover:bg-white/20 transition-all"
+                  >
+                    不保存
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await confirmUnsaved.onSave();
+                    }}
+                    className="px-6 py-3 bg-white text-blue-950 rounded-xl font-bold text-sm hover:bg-blue-100 transition-all flex items-center gap-2"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    保存
+                  </button>
                 </div>
-
-
-                {/* 底部按钮移除，已移至顶部 */}
-              </form>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>

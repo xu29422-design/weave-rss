@@ -1,6 +1,18 @@
 import { createClient } from "@vercel/kv";
 import crypto from "crypto";
 
+export interface ThemeConfig {
+  webhookUrl?: string;
+  aiProvider?: 'google' | 'openai';
+  geminiApiKey?: string;
+  openaiApiKey?: string;
+  openaiBaseUrl?: string;
+  openaiModel?: string;
+  analystPrompt?: string;
+  editorPrompt?: string;
+  tldrPrompt?: string;
+}
+
 export interface Settings {
   aiProvider: 'google' | 'openai';
   geminiApiKey: string;
@@ -26,6 +38,8 @@ export interface Settings {
   themeRemovedSources?: Record<string, string[]>;
   // 推送渠道配置（全局配置池）
   pushChannels?: PushChannel[]; // 推送渠道列表（机器人、邮箱、轻维表）
+  // 按主题的独立配置
+  themeConfigs?: Record<string, ThemeConfig>;
 }
 
 /**

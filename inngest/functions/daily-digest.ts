@@ -83,13 +83,33 @@ export const digestWorker = inngest.createFunction(
   async ({ event, step }) => {
     const userId = event.data.userId as string;
     const cardRssUrls = (event.data.rssUrls as string[] | undefined)?.filter(Boolean);
+    const themeId = event.data.themeId as string | undefined;
 
     try {
       await setDigestRunStatus(userId, { status: "running", progress: 0, message: "正在准备…" });
       console.log(`🔄 开始处理用户 ${userId} 的简报...${cardRssUrls?.length ? ` (仅本卡片 ${cardRssUrls.length} 个源)` : ""}`);
 
       const { settings, rssSources, useSuperSub } = await step.run("get-config", async () => {
-        const s = await getSettings(userId);
+        let s = await getSettings(userId);
+        
+        // 如果传入了 themeId，尝试匹配 Profile 并合并配置
+        if (themeId && s?.themeConfigs && s.themeConfigs[themeId]) {
+          const profile = s.themeConfigs[themeId];
+          console.log(`🔍 匹配到主题卡片 [${themeId}] 的独立配置，将使用该配置的 AI 和 Webhook 设置`);
+          s = {
+            ...s,
+            aiProvider: profile.aiProvider || s.aiProvider,
+            geminiApiKey: profile.geminiApiKey || s.geminiApiKey,
+            openaiApiKey: profile.openaiApiKey || s.openaiApiKey,
+            openaiBaseUrl: profile.openaiBaseUrl || s.openaiBaseUrl,
+            openaiModel: profile.openaiModel || s.openaiModel,
+            analystPrompt: profile.analystPrompt || s.analystPrompt,
+            editorPrompt: profile.editorPrompt || s.editorPrompt,
+            tldrPrompt: profile.tldrPrompt || s.tldrPrompt,
+            webhookUrl: profile.webhookUrl || s.webhookUrl,
+          };
+        }
+
         const r = cardRssUrls?.length ? cardRssUrls : await getRSSSources(userId);
         const useSuperSub = !cardRssUrls?.length; // 仅当「全部源」时启用超级订阅
         return { settings: s, rssSources: r, useSuperSub };
