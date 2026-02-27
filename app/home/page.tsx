@@ -234,17 +234,15 @@ function MacBookFrame() {
         </div>
         {/* 屏幕内容区：保持 16:10 比例 */}
         <div className="relative rounded-lg overflow-hidden bg-white w-full aspect-[16/10] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.4)]">
-          {/* 按 1680x1050 渲染，然后缩放 */}
-          <div className="absolute top-0 left-0 w-[1680px] h-[1050px] origin-top-left" style={{ transform: "scale(0.4285)" }}>
-             <style dangerouslySetInnerHTML={{ __html: `
-               @media (min-width: 768px) {
-                 .mac-screen-content { transform: scale(0.5119) !important; }
-               }
-               .mac-screen-content { transform: scale(0.4285); }
-             `}} />
-             <div className="mac-screen-content absolute top-0 left-0 w-[1680px] h-[1050px] origin-top-left">
-               <DesktopChatMock />
-             </div>
+          {/* 按 1680x1050 渲染，然后精确缩放以填满内屏 */}
+          <style dangerouslySetInnerHTML={{ __html: `
+            @media (min-width: 768px) {
+              .mac-screen-content { transform: scale(0.496428) !important; }
+            }
+            .mac-screen-content { transform: scale(0.413095); }
+          `}} />
+          <div className="mac-screen-content absolute top-0 left-0 w-[1680px] h-[1050px] origin-top-left bg-[#f5f5f5]">
+            <DesktopChatMock />
           </div>
         </div>
       </div>
