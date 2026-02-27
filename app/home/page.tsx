@@ -236,7 +236,7 @@ function MacBookFrame() {
         <div className="relative rounded-lg overflow-hidden bg-white w-full aspect-[16/10] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.4)]">
           {/* 按 1680x1050 渲染，然后缩放 */}
           <div className="absolute top-0 left-0 w-[1680px] h-[1050px] origin-top-left" style={{ transform: "scale(0.4285)" }}>
-             <style dangerouslySetContent={{ __html: `
+             <style dangerouslySetInnerHTML={{ __html: `
                @media (min-width: 768px) {
                  .mac-screen-content { transform: scale(0.5119) !important; }
                }
