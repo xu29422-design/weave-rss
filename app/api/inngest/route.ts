@@ -2,8 +2,9 @@ import { serve } from "inngest/next";
 import { inngest } from "@/inngest/client";
 import { dailyScheduler, digestWorker } from "@/inngest/functions/daily-digest";
 
-// 单步最长 60s（免费套餐上限），避免 digest 某一步触发 FUNCTION_INVOCATION_TIMEOUT（仅对 /api/inngest 生效）
-export const maxDuration = 60;
+// Inngest 单次请求可能长时间轮询/执行，需提高 Vercel 函数时长上限。
+// Hobby 计划最高 300s，Pro 最高 800s；超时仍会报 504 FUNCTION_INVOCATION_TIMEOUT。
+export const maxDuration = 300;
 
 export const { GET, POST, PUT } = serve({
   client: inngest,

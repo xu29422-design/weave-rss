@@ -3,8 +3,6 @@ import { getSettings, getRSSSources, savePushLog, saveSettings, getPushChannels,
 import { fetchNewItems } from "@/lib/rss-utils";
 import { analyzeItem, generateConsolidatedReport, generateTLDR, shortenContent, filterTopItems } from "@/lib/ai-service";
 import { getAllActiveUsers } from "@/lib/auth";
-import { pushDigestToKdocs, getFirstDBSheetId } from "@/lib/kdocs-api";
-
 const CATEGORY_MAP: Record<string, string> = {
   'Product': '📱 竞品动态',
   'AI Tech': '🔥 行业热点',
@@ -17,10 +15,8 @@ const CATEGORY_MAP: Record<string, string> = {
 const ITEMS_PER_BATCH = 40;
 /** 预筛选上限，最多保留两批的量 */
 const FILTER_TOP_LIMIT = 80;
-/** 单步内最多分析条数（免费套餐 60s 上限，3 条约 15-30s 内更安全，防止 Vercel 超时） */
-const ANALYZE_CHUNK_SIZE = 3;
-/** assemble-and-send 单步最大耗时（毫秒），超时则返回部分结果，避免 FUNCTION_INVOCATION_TIMEOUT 导致 finalization 报错 */
-const ASSEMBLE_STEP_DEADLINE_MS = 52_000;
+/** 单步内最多分析条数，2 条/步更稳，降低单次请求超时风险 */
+const ANALYZE_CHUNK_SIZE = 2;
 
 /**
  * 智能延迟函数：智谱需要更长的间隔
@@ -224,16 +220,77 @@ export const digestWorker = inngest.createFunction(
       }
     await setDigestRunStatus(userId, { status: "running", progress: 75, message: "正在组装与推送…" });
 
-    const finalReport = await step.run("assemble-and-send", async () => {
-      const stepStart = Date.now();
-      await setDigestRunStatus(userId, { status: "running", progress: 90, message: "内容推送中" });
-      console.log("=== 开始组装简报 ===");
-
+    // Step 1：仅组装内容并写入 KV（不推送），缩短单次请求耗时，多维表可立即拉取
+    const assembleResult = await step.run("assemble-and-save", async () => {
       const MAX_LENGTH = 4800;
       const MAX_RETRIES = 2;
-      const pushResults: any = { channels: {} };
       const allReportContents: string[] = [];
       const allHighQualityItems: any[] = [];
+
+      console.log("=== 组装简报内容（不推送）===");
+      for (let partIndex = 0; partIndex < batchResults.length; partIndex++) {
+        const { tldr, sections, highQualityItems } = batchResults[partIndex];
+        const partTitle = batchResults.length > 1 ? (partIndex === 0 ? "今日简报（上）" : "今日简报（下）") : "AI 行业简报";
+
+        let lines: string[] = ["## " + partTitle, "", (tldr || "").trim(), ""];
+        sections.forEach((s, idx) => {
+          if (s?.content?.trim()) {
+            lines.push(`### ${idx + 1}. ${s.category}`);
+            lines.push("");
+            lines.push(s.content.trim());
+            lines.push("");
+          }
+        });
+        lines.push("---", "", "> 本报告由 Weave 编织生成");
+        let reportContent = lines.join("\n");
+
+        let retryCount = 0;
+        while (reportContent.length > MAX_LENGTH && retryCount < MAX_RETRIES) {
+          const shortened = await shortenContent(reportContent, settings!);
+          if (shortened && shortened.length < reportContent.length) reportContent = shortened;
+          retryCount++;
+        }
+        if (reportContent.length > 5000) {
+          reportContent = reportContent.substring(0, 4900) + "\n\n...(内容过长已截断)";
+        }
+        allReportContents.push(reportContent);
+        allHighQualityItems.push(...highQualityItems);
+      }
+
+      const digestDataForLog = {
+        highQualityItems: allHighQualityItems.map((item) => ({
+          title: item.title,
+          summary: item.summary,
+          link: item.link,
+          category: item.category,
+          score: item.score,
+        })),
+      };
+      await savePushLog(userId, {
+        status: "success",
+        digestData: digestDataForLog,
+        reportContent: allReportContents.join("\n\n---\n\n"),
+        details: {
+          themeCount: settings!.subscribedThemes?.length || 0,
+          sourceCount: rssSources.length,
+          partCount: batchResults.length,
+          pushPending: true,
+        },
+      });
+      await setDigestRunStatus(userId, { status: "running", progress: 90, message: "内容已就绪，即将推送…" });
+
+      return {
+        allReportContents,
+        allHighQualityItems: digestDataForLog.highQualityItems,
+        batchResultsLength: batchResults.length,
+      };
+    });
+
+    // Step 2：仅推送（读上一步返回内容），单步只做网络请求，降低超时风险
+    const finalReport = await step.run("push-to-channels", async () => {
+      await setDigestRunStatus(userId, { status: "running", progress: 92, message: "内容推送中" });
+      const { allReportContents, batchResultsLength } = assembleResult;
+      const pushResults: any = { channels: {} };
 
       const channels = await getPushChannels(userId);
       const themeConfigs = await getAllThemePushConfigs(userId);
@@ -268,47 +325,11 @@ export const digestWorker = inngest.createFunction(
         });
       }
 
-      // 按批组装并推送（一批一条消息；两批则推送「今日简报（上）」「今日简报（下）」）
-      for (let partIndex = 0; partIndex < batchResults.length; partIndex++) {
-        if (Date.now() - stepStart > ASSEMBLE_STEP_DEADLINE_MS) {
-          console.warn("⏱️ assemble-and-send 即将超时，跳过剩余批次");
-          break;
-        }
-        const { tldr, sections, highQualityItems } = batchResults[partIndex];
-        const partTitle = batchResults.length > 1 ? (partIndex === 0 ? "今日简报（上）" : "今日简报（下）") : "AI 行业简报";
-
-        let lines: string[] = ["## " + partTitle, "", (tldr || "").trim(), ""];
-        sections.forEach((s, idx) => {
-          if (s?.content?.trim()) {
-            lines.push(`### ${idx + 1}. ${s.category}`);
-            lines.push("");
-            lines.push(s.content.trim());
-            lines.push("");
-          }
-        });
-        lines.push("---", "", "> 本报告由 Weave 编织生成");
-        let reportContent = lines.join("\n");
-
-        let retryCount = 0;
-        while (reportContent.length > MAX_LENGTH && retryCount < MAX_RETRIES) {
-          const shortened = await shortenContent(reportContent, settings!);
-          if (shortened && shortened.length < reportContent.length) reportContent = shortened;
-          retryCount++;
-        }
-        if (reportContent.length > 5000) {
-          reportContent = reportContent.substring(0, 4900) + "\n\n...(内容过长已截断)";
-        }
-        allReportContents.push(reportContent);
-        allHighQualityItems.push(...highQualityItems);
-
+      for (let partIndex = 0; partIndex < allReportContents.length; partIndex++) {
+        const reportContent = allReportContents[partIndex];
         for (const [channelId, { channel, isPrimary }] of Array.from(channelsToPush.entries())) {
-        if (Date.now() - stepStart > ASSEMBLE_STEP_DEADLINE_MS) {
-          console.warn("⏱️ assemble-and-send 即将超时，跳过剩余渠道");
-          pushResults.channels[channelId] = { success: false, type: channel.type, name: channel.name, error: "步骤超时未推送" };
-          break;
-        }
-        try {
-          if (channel.type === 'webhook' && channel.webhookUrl) {
+          try {
+            if (channel.type === 'webhook' && channel.webhookUrl) {
             // 推送到 Webhook
             console.log(`=== 推送到 ${channel.name} (${isPrimary ? '主渠道' : '辅助渠道'}) ===`);
             
@@ -347,55 +368,9 @@ export const digestWorker = inngest.createFunction(
             console.log(`⚠️  邮箱推送功能待实现: ${channel.emailAddress}`);
             pushResults.channels[channelId] = { success: false, type: 'email', name: channel.name, error: '邮箱推送功能待实现' };
           } else if (channel.type === 'kdocs') {
-            // 推送到轻维表
-            console.log(`=== 推送到轻维表 ${channel.name} (${isPrimary ? '主渠道' : '辅助渠道'}) ===`);
-            
-            if (!channel.kdocsAppId || !channel.kdocsAppSecret || !channel.kdocsFileToken) {
-              console.error(`❌ 轻维表 ${channel.name} 配置不完整`);
-              pushResults.channels[channelId] = { success: false, type: 'kdocs', name: channel.name, error: '配置不完整' };
-              continue;
-            }
-
-            let dbSheetId = channel.kdocsDBSheetId;
-            if (!dbSheetId) {
-              console.log("⚠️  DBSheet ID 为空，尝试自动获取...");
-              const firstSheetId = await getFirstDBSheetId(
-                channel.kdocsAppId,
-                channel.kdocsAppSecret,
-                channel.kdocsFileToken
-              );
-              if (firstSheetId) {
-                dbSheetId = firstSheetId;
-                console.log(`✅ 自动获取到 DBSheet ID: ${dbSheetId}`);
-              } else {
-                console.error("❌ 无法自动获取 DBSheet ID");
-                pushResults.channels[channelId] = { success: false, type: 'kdocs', name: channel.name, error: 'DBSheet ID 未配置且无法自动获取' };
-                continue;
-              }
-            }
-            
-            const today = new Date().toISOString().split('T')[0];
-            const kdocsResult = await pushDigestToKdocs(
-              channel.kdocsAppId,
-              channel.kdocsAppSecret,
-              channel.kdocsFileToken,
-              dbSheetId,
-              {
-                date: today,
-                tldr: tldr || '',
-                categories: sections.map(s => ({ name: s.category, content: s.content })),
-                totalItems: highQualityItems.length,
-                reportContent: reportContent,
-              }
-            );
-
-            if (kdocsResult.success) {
-              console.log(`✅ 推送到轻维表 ${channel.name} 成功！记录ID: ${kdocsResult.recordId}`);
-              pushResults.channels[channelId] = { success: true, type: 'kdocs', name: channel.name, recordId: kdocsResult.recordId };
-            } else {
-              console.error(`❌ 推送到轻维表 ${channel.name} 失败:`, kdocsResult.error);
-              pushResults.channels[channelId] = { success: false, type: 'kdocs', name: channel.name, error: kdocsResult.error };
-            }
+            // 金山轻维表：不再服务端主动推送，由用户侧自行拉取
+            console.log(`ℹ️ 金山轻维表 ${channel.name}：已取消服务端主动推送，由用户侧自行拉取`);
+            pushResults.channels[channelId] = { success: true, type: 'kdocs', name: channel.name, skipped: true, reason: '已取消服务端主动推送' };
           } else if (channel.type === 'wps-dbsheet') {
             // WPS 多维表：不在推送时写入。用户在多维表侧通过 API（如 /api/digest/latest）主动拉取已有简报数据。
             console.log(`ℹ️ WPS 多维表格 ${channel.name}：由用户通过 API 主动拉取数据，此处不写入`);
@@ -450,25 +425,16 @@ export const digestWorker = inngest.createFunction(
       await savePushLog(userId, {
         status: hasSuccess ? "success" : "failed",
         error: channelResults.some((r: any) => !r.success) ? JSON.stringify(pushResults) : undefined,
-        digestData: {
-          highQualityItems: allHighQualityItems.map((item) => ({
-            title: item.title,
-            summary: item.summary,
-            link: item.link,
-            category: item.category,
-            score: item.score,
-          })),
-        },
+        digestData: { highQualityItems: assembleResult.allHighQualityItems },
         reportContent: allReportContents.join("\n\n---\n\n"),
         details: {
           themeCount: settings!.subscribedThemes?.length || 0,
           sourceCount: rssSources.length,
           channelCount: channelResults.length,
           successCount: channelResults.filter((r: any) => r.success).length,
-          partCount: batchResults.length,
+          partCount: batchResultsLength,
         },
       });
-
       await setDigestRunStatus(userId, {
         status: hasSuccess ? "success" : "failed",
         progress: 100,
@@ -477,11 +443,7 @@ export const digestWorker = inngest.createFunction(
       });
 
       if (channelResults.length > 0) {
-        return {
-          status: hasSuccess ? "sent" : "partial_failed",
-          partCount: batchResults.length,
-          pushResults,
-        };
+        return { status: hasSuccess ? "sent" : "partial_failed", partCount: batchResultsLength, pushResults };
       }
       return { status: "no_push_target" };
     });
@@ -565,45 +527,10 @@ export const testPushWorker = inngest.createFunction(
           // 邮箱推送（待实现）
           return { success: false, type: 'email', name: channel.name, error: '邮箱推送功能待实现' };
         } else if (channel.type === 'kdocs') {
-          // 推送到轻维表
-          if (!channel.kdocsAppId || !channel.kdocsAppSecret || !channel.kdocsFileToken) {
-            return { success: false, type: 'kdocs', name: channel.name, error: '配置不完整' };
-          }
-
-          let dbSheetId = channel.kdocsDBSheetId;
-          if (!dbSheetId) {
-            const firstSheetId = await getFirstDBSheetId(
-              channel.kdocsAppId,
-              channel.kdocsAppSecret,
-              channel.kdocsFileToken
-            );
-            if (firstSheetId) {
-              dbSheetId = firstSheetId;
-            } else {
-              return { success: false, type: 'kdocs', name: channel.name, error: 'DBSheet ID 未配置且无法自动获取' };
-            }
-          }
-          
-          const today = new Date().toISOString().split('T')[0];
-          const kdocsResult = await pushDigestToKdocs(
-            channel.kdocsAppId,
-            channel.kdocsAppSecret,
-            channel.kdocsFileToken,
-            dbSheetId,
-            {
-              date: today,
-              tldr: '测试推送',
-              categories: [{ name: '测试', content: testMessage }],
-              totalItems: 1,
-              reportContent: testMessage,
-            }
-          );
-
-          if (kdocsResult.success) {
-            return { success: true, type: 'kdocs', name: channel.name, recordId: kdocsResult.recordId };
-          } else {
-            return { success: false, type: 'kdocs', name: channel.name, error: kdocsResult.error };
-          }
+          // 金山轻维表：已取消服务端主动推送
+          return { success: true, type: 'kdocs', name: channel.name, skipped: true, reason: '已取消服务端主动推送' };
+        } else if (channel.type === 'wps-dbsheet') {
+          return { success: true, type: 'wps-dbsheet', name: channel.name, skipped: true, reason: '由多维表侧 API 主动拉取' };
         } else {
           return { success: false, error: '不支持的推送渠道类型' };
         }
