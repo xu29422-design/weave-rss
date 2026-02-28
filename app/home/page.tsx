@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Sparkles, ArrowRight, Mail, MessageSquare, Bot, User, ChevronRight, Code, Database, BookOpen, Search, Plus, Folder, Phone, Menu, MoreHorizontal, Smile, Scissors, AtSign, Rss, ChevronDown } from "lucide-react";
 import { siGithub, siProducthunt, siMedium, siTechcrunch, siArstechnica, siNewyorktimes, siVercel } from "simple-icons/icons";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform, type MotionValue } from "framer-motion";
 
 // --- 产品形态图例：聊天内容（供 iPhone 内嵌）---
 const ChatMock = () => (
@@ -257,7 +257,7 @@ function MacBookFrame() {
 }
 
 // --- 产品形态图例 Section：Mac 左 + iPhone 右（flex 布局保证两者都可见）---
-function ProductShapeSection({ style }: { style?: React.CSSProperties }) {
+function ProductShapeSection({ style }: { style?: React.CSSProperties & { y?: MotionValue<number> } }) {
   return (
     <section className="relative z-10 pt-4 pb-20 md:pt-10 md:pb-32 -mt-8 md:-mt-16">
       <div className="max-w-[1200px] mx-auto relative z-10 px-4">
