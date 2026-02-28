@@ -93,6 +93,7 @@ export async function persistRSS(rssUrls: string[]) {
   await saveRSSSources(userId, rssUrls);
   revalidatePath("/config");
   revalidatePath("/onboarding");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 

@@ -179,6 +179,9 @@ export async function fetchNewItems(userId: string, urls: string[], superSubKeyw
   console.log(`开始 URL 去重检查...`);
   const newItems: RawRSSItem[] = [];
   
+  // 检查是否是被 Inngest 重试（为了支持失败重试时，能再次把刚才抓到过的当新文章）
+  // 为了确保失败重试能获取到内容，并且因为我们其实有 Inngest 的调度兜底，我们可以尝试放宽这个 NX。
+  
   if (titleDedupedItems.length > 0) {
     const pipeline = kv.pipeline();
     const itemHashes = titleDedupedItems.map(item => {
@@ -186,16 +189,34 @@ export async function fetchNewItems(userId: string, urls: string[], superSubKeyw
       return { item, redisKey: `user:${userId}:seen:${hash}` };
     });
 
-    // 批量执行 SET NX
+    // 这里我们做两步：先查是否真的被存了。因为 SET NX 只要执行过一次就存进去了。
+    // 但是在 Inngest 的分步执行中，如果在 "fetch-batch" 步存进去了，但是后面的 "analyze" 步挂了，
+    // 点 Rerun 时，"fetch-batch" 重新跑，就会发现这些文章已经被 "seen" 过了！
+    // 我们给文章打上时间戳
     itemHashes.forEach(({ redisKey }) => {
-      pipeline.set(redisKey, "1", { nx: true, ex: 60 * 60 * 24 * 7 });
+      pipeline.set(redisKey, Date.now(), { nx: true, ex: 60 * 60 * 24 * 7 });
+      // 同时我们也用 get 来获取现有的值
+      pipeline.get(redisKey);
     });
 
     const results = await pipeline.exec();
 
-    // 根据执行结果筛选真正的新文章
-    results.forEach((isNew, index) => {
-      if (isNew === "OK" || isNew === 1) { // Redis 返回 OK 或 1 表示设置成功
+    // 每一项都有两个返回结果：set_result 和 get_result
+    results.forEach((result, i) => {
+      const index = Math.floor(i / 2);
+      if (i % 2 === 0) return; // 跳过 SET 的结果，我们看 GET 的结果
+      
+      const setResult = results[i - 1];
+      const getResult = result as number | null;
+      
+      // 如果 SET NX 成功 (OK / 1)，说明是全新的文章
+      if (setResult === "OK" || setResult === 1) {
+        newItems.push(itemHashes[index].item);
+      } 
+      // 如果 SET NX 失败，但是这个 key 是在过去 1 小时内设置的（时间戳），
+      // 那么它极有可能是当前这波任务（或者刚刚挂掉的那波任务）刚写入的，应当被放行用于重试。
+      else if (getResult && (Date.now() - Number(getResult) < 60 * 60 * 1000)) {
+        console.log(`♻️ 识别到近期写入的文章（疑似重试），予以放行: ${itemHashes[index].item.title}`);
         newItems.push(itemHashes[index].item);
       }
     });

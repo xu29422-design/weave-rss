@@ -1763,6 +1763,11 @@ function DashboardContent() {
                               <span className="truncate max-w-[120px] uppercase tracking-wider">{source.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}</span>
                             </div>
                           ))}
+                          {(theme.sources.length + (customThemeSources[theme.id]?.length || 0)) > 3 && (
+                            <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-xl border border-white/5 text-[10px] text-blue-100/50 font-bold">
+                              +{(theme.sources.length + (customThemeSources[theme.id]?.length || 0)) - 3} {(customThemeSources[theme.id]?.length || 0) > 0 ? '(含自定义)' : ''}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1795,7 +1800,7 @@ function DashboardContent() {
             >
               <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">已订阅主题</h2>
 
-              {subscribedThemeIds.length > 0 || settings.rssUrls || settings.superSubKeyword ? (
+              {subscribedThemeIds.length > 0 || (settings.rssUrls && settings.rssUrls.trim()) || settings.superSubKeyword ? (
                 <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
                   {/* 已订阅主题卡片 */}
                   {subscribedThemeIds.map((themeId) => {
@@ -1858,6 +1863,28 @@ function DashboardContent() {
                               <p className="text-sm text-blue-100/80 font-medium leading-relaxed">
                                 {theme.desc}
                               </p>
+                              <div className="mt-8 pt-8 border-t border-white/10">
+                                <div className="flex items-center gap-2 mb-4">
+                                  <Rss className="w-4 h-4 text-blue-100/50" />
+                                  <span className="text-[10px] font-black text-blue-100/50 uppercase tracking-[0.2em]">包含 {allSources.length} 个信源</span>
+                                </div>
+                                <div className="flex flex-wrap gap-2.5">
+                                  {allSources.slice(0, 3).map((source: string, idx: number) => {
+                                    const isCustom = idx >= theme.sources.length || !theme.sources.includes(source);
+                                    return (
+                                      <div key={idx} className={`flex items-center gap-2 px-3 py-2 bg-white/5 rounded-xl border border-white/5 text-[10px] text-blue-100/70 font-bold transition-all hover:bg-white/10 hover:text-white ${isCustom ? 'ring-1 ring-blue-400/30' : ''}`}>
+                                        <div className={`w-1.5 h-1.5 rounded-full ${isCustom ? 'bg-blue-400' : 'bg-gradient-to-br ' + theme.color}`} />
+                                        <span className="truncate max-w-[120px] uppercase tracking-wider">{source.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}</span>
+                                      </div>
+                                    );
+                                  })}
+                                  {allSources.length > 3 && (
+                                    <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-xl border border-white/5 text-[10px] text-blue-100/50 font-bold">
+                                      +{allSources.length - 3} {allSources.length > theme.sources.length ? '(含自定义)' : ''}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             </>
                           )}
 
