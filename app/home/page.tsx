@@ -36,26 +36,32 @@ const ChatMock = () => (
               <div className="text-[13px] font-bold text-blue-200/90 uppercase tracking-widest mb-1 relative z-10">Daily Digest</div>
               <div className="text-[22px] font-bold text-white leading-tight relative z-10">AI 行业深度观察</div>
             </div>
-            <div className="p-5 space-y-4">
-              <div className="space-y-3">
-                <div className="flex gap-3 items-start">
-                  <div className="w-2 h-2 rounded-full bg-blue-400 mt-2 shrink-0"></div>
-                  <div className="text-[17px] text-gray-200 leading-relaxed">DeepSeek MoE 架构更新，多项指标大幅提升。</div>
+            <div className="p-5 space-y-4 relative z-10">
+              <div className="space-y-4">
+                <div className="flex gap-3 items-start bg-white/5 p-3 rounded-lg border border-white/5 shadow-inner">
+                  <div className="w-2 h-2 rounded-full bg-blue-400 mt-2 shrink-0 shadow-[0_0_8px_rgba(96,165,250,0.8)]"></div>
+                  <div className="text-[17px] text-gray-200 leading-relaxed font-medium">DeepSeek MoE 架构更新，多项指标大幅提升。</div>
                 </div>
-                <div className="w-full h-px bg-white/5"></div>
-                <div className="flex gap-3 items-start">
-                  <div className="w-2 h-2 rounded-full bg-blue-400 mt-2 shrink-0"></div>
-                  <div className="text-[17px] text-gray-200 leading-relaxed">OpenAI AGI 路线图内部备忘录泄露，引发热议。</div>
+                <div className="flex gap-3 items-start bg-white/5 p-3 rounded-lg border border-white/5 shadow-inner">
+                  <div className="w-2 h-2 rounded-full bg-blue-400 mt-2 shrink-0 shadow-[0_0_8px_rgba(96,165,250,0.8)]"></div>
+                  <div className="text-[17px] text-gray-200 leading-relaxed font-medium">OpenAI AGI 路线图内部备忘录泄露，引发热议。</div>
                 </div>
-                <div className="w-full h-px bg-white/5"></div>
-                <div className="flex gap-3 items-start">
-                  <div className="w-2 h-2 rounded-full bg-blue-400 mt-2 shrink-0"></div>
-                  <div className="text-[17px] text-gray-200 leading-relaxed">苹果发布新一代 M 系列芯片，AI 算力翻倍。</div>
+                <div className="flex gap-3 items-start bg-white/5 p-3 rounded-lg border border-white/5 shadow-inner">
+                  <div className="w-2 h-2 rounded-full bg-blue-400 mt-2 shrink-0 shadow-[0_0_8px_rgba(96,165,250,0.8)]"></div>
+                  <div className="text-[17px] text-gray-200 leading-relaxed font-medium">苹果发布新一代 M 系列芯片，AI 算力翻倍。</div>
                 </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
+    </div>
+    
+    {/* 底部输入框填充空白 */}
+    <div className="h-[90px] bg-[#374151]/90 backdrop-blur-md border-t border-white/5 flex items-center px-6 shrink-0 relative z-10">
+      <div className="w-full h-12 bg-[#1f2937] rounded-full border border-white/10 flex items-center px-5 text-white/40 text-[16px] shadow-inner">
+        <Smile className="w-6 h-6 mr-3 text-white/40" />
+        输入关键字或问题...
       </div>
     </div>
   </div>
@@ -90,58 +96,58 @@ function IPhoneFrame() {
 
 const DesktopChatMock = () => (
   <div className="h-full flex bg-[#f5f5f5] text-[#333] font-sans overflow-hidden">
-    {/* 最左侧细导航栏 */}
-    <div className="w-[64px] bg-[#ebebeb] border-r border-[#d6d6d6] flex flex-col items-center py-5 shrink-0 justify-between">
-      <div className="flex flex-col items-center gap-7">
-        <div className="w-11 h-11 rounded bg-blue-500 overflow-hidden shadow-sm">
-          <div className="w-full h-full flex items-center justify-center text-white font-bold text-[15px]">我</div>
+    {/* 左侧极其纤细的侧边栏 */}
+    <div className="w-[48px] bg-[#ebebeb] border-r border-[#d6d6d6] flex flex-col items-center py-4 shrink-0 justify-between">
+      <div className="flex flex-col items-center gap-6">
+        <div className="w-8 h-8 rounded bg-blue-500 overflow-hidden shadow-sm flex items-center justify-center text-white font-bold text-[13px]">
+          我
         </div>
         <div className="relative cursor-pointer group">
-          <MessageSquare className="w-[26px] h-[26px] text-blue-500" />
-          <div className="absolute -top-1 -right-1.5 w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-[#ebebeb] flex items-center justify-center text-white text-[10px] font-bold">3</div>
+          <MessageSquare className="w-5 h-5 text-blue-500" />
+          <div className="absolute -top-1 -right-1.5 w-[16px] h-[16px] bg-red-500 rounded-full border-2 border-[#ebebeb] flex items-center justify-center text-white text-[9px] font-bold shadow-sm">3</div>
         </div>
         <div className="cursor-pointer text-gray-400 hover:text-gray-500 transition-colors">
-          <AtSign className="w-[26px] h-[26px]" />
+          <AtSign className="w-5 h-5" />
         </div>
         <div className="cursor-pointer text-gray-400 hover:text-gray-500 transition-colors">
-          <User className="w-[26px] h-[26px]" />
+          <User className="w-5 h-5" />
         </div>
         <div className="cursor-pointer text-gray-400 hover:text-gray-500 transition-colors">
-          <Folder className="w-[26px] h-[26px]" />
+          <Folder className="w-5 h-5" />
         </div>
-        <div className="cursor-pointer text-gray-400 hover:text-gray-500 transition-colors font-bold text-xl leading-none mt-2">
+        <div className="cursor-pointer text-gray-400 hover:text-gray-500 transition-colors font-bold text-lg leading-none mt-1">
           ...
         </div>
       </div>
-      <div className="flex flex-col items-center gap-6">
+      <div className="flex flex-col items-center gap-5">
         <div className="cursor-pointer text-gray-400 hover:text-gray-500 transition-colors">
-          <Phone className="w-[26px] h-[26px]" />
+          <Phone className="w-5 h-5" />
         </div>
         <div className="cursor-pointer text-gray-400 hover:text-gray-500 transition-colors">
-          <Menu className="w-[26px] h-[26px]" />
+          <Menu className="w-5 h-5" />
         </div>
       </div>
     </div>
 
-    {/* 中间会话列表 */}
-    <div className="w-[240px] lg:w-[280px] bg-[#f7f7f7] border-r border-[#d6d6d6] flex flex-col shrink-0">
-      <div className="h-16 flex items-center px-4 gap-3 shrink-0">
-        <div className="flex-1 h-8 bg-[#e2e2e2] rounded flex items-center px-3 text-[13px] text-gray-500 cursor-text">
-          <Search className="w-4 h-4 mr-2 opacity-70" /> 搜索
+    {/* 中间较窄的会话列表 */}
+    <div className="w-[200px] lg:w-[240px] bg-[#f7f7f7] border-r border-[#d6d6d6] flex flex-col shrink-0">
+      <div className="h-12 flex items-center px-3 gap-2 shrink-0">
+        <div className="flex-1 h-7 bg-[#e2e2e2] rounded flex items-center px-2.5 text-[11px] text-gray-500 cursor-text shadow-inner">
+          <Search className="w-3.5 h-3.5 mr-1.5 opacity-60" /> 搜索
         </div>
-        <div className="w-8 h-8 bg-[#e2e2e2] rounded flex items-center justify-center text-gray-600 cursor-pointer hover:bg-[#d8d8d8] transition-colors">
-          <Plus className="w-4 h-4" />
+        <div className="w-7 h-7 bg-[#e2e2e2] rounded flex items-center justify-center text-gray-600 cursor-pointer hover:bg-[#d8d8d8] transition-colors shadow-sm">
+          <Plus className="w-3.5 h-3.5" />
         </div>
       </div>
-      <div className="flex-1 overflow-hidden p-2 space-y-1">
-        <div className="flex items-center gap-3 p-3 bg-[#c4c4c4] rounded-lg cursor-pointer">
-          <div className="w-11 h-11 rounded bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-[20px] shrink-0">🤖</div>
+      <div className="flex-1 overflow-hidden p-1.5 space-y-0.5">
+        <div className="flex items-center gap-2 p-2 bg-[#c4c4c4] rounded-md cursor-pointer shadow-sm">
+          <div className="w-9 h-9 rounded bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-[18px] shrink-0 shadow-inner">🤖</div>
           <div className="flex-1 overflow-hidden">
-            <div className="flex justify-between items-center mb-1">
-              <div className="text-[14px] font-medium text-gray-900 truncate">AI 前沿资讯速递(28)</div>
-              <div className="text-[11px] text-gray-500 shrink-0 ml-2">昨天</div>
+            <div className="flex justify-between items-center mb-0.5">
+              <div className="text-[12px] font-medium text-gray-900 truncate">AI 前沿资讯速递(28)</div>
+              <div className="text-[10px] text-gray-500 shrink-0 ml-1">昨天</div>
             </div>
-            <div className="text-[13px] text-gray-500 truncate">Weave助手: 🌟 今日焦点 春节...</div>
+            <div className="text-[11px] text-gray-600 truncate">Weave助手: 🌟 今日焦点 春节...</div>
           </div>
         </div>
         {[
@@ -151,24 +157,24 @@ const DesktopChatMock = () => (
           { name: "内部闲聊摸鱼群", msg: "王强: 哈哈哈确实", time: "14:35", color: "bg-green-500", badge: 2 },
           { name: "运动打卡小分队", msg: "周末去爬山吗？", time: "14:33", color: "bg-purple-500" },
         ].map((c, i) => (
-          <div key={i} className="flex items-center gap-3 p-3 hover:bg-[#e4e4e4] rounded-lg transition-colors cursor-pointer relative">
-             <div className={`w-11 h-11 rounded text-white flex items-center justify-center text-[18px] font-bold shrink-0 ${c.color} relative`}>
+          <div key={i} className="flex items-center gap-2 p-2 hover:bg-[#e4e4e4] rounded-md transition-colors cursor-pointer relative">
+             <div className={`w-9 h-9 rounded text-white flex items-center justify-center text-[15px] font-bold shrink-0 ${c.color} relative shadow-sm`}>
                 {c.name[0]}
                 {c.badge && (
-                  <div className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[11px] rounded-full h-5 min-w-[20px] px-1 flex items-center justify-center border-2 border-[#f7f7f7] shadow-sm z-10">{c.badge}</div>
+                  <div className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] rounded-full h-4 min-w-[16px] px-1 flex items-center justify-center border border-[#f7f7f7] shadow-sm z-10">{c.badge}</div>
                 )}
              </div>
              <div className="flex-1 overflow-hidden">
-               <div className="flex justify-between items-center mb-1">
-                 <div className="flex items-center gap-1.5 overflow-hidden">
-                   <div className="text-[14px] text-gray-800 truncate">{c.name}</div>
+               <div className="flex justify-between items-center mb-0.5">
+                 <div className="flex items-center gap-1 overflow-hidden">
+                   <div className="text-[12px] text-gray-800 truncate">{c.name}</div>
                    {c.tag && (
-                     <span className={`text-[10px] px-1.5 py-0.5 rounded-sm shrink-0 ${c.tag === '外部' ? 'text-orange-500 border border-orange-500/50' : 'text-blue-500 border border-blue-500/50'}`}>{c.tag}</span>
+                     <span className={`text-[9px] px-1 py-0.5 rounded-[3px] shrink-0 ${c.tag === '外部' ? 'text-orange-500 bg-orange-500/10' : 'text-blue-500 bg-blue-500/10'}`}>{c.tag}</span>
                    )}
                  </div>
-                 <div className="text-[11px] text-gray-400 shrink-0 ml-2">{c.time}</div>
+                 <div className="text-[10px] text-gray-400 shrink-0 ml-1">{c.time}</div>
                </div>
-               <div className="text-[13px] text-gray-400 truncate">{c.msg}</div>
+               <div className="text-[11px] text-gray-500 truncate">{c.msg}</div>
              </div>
           </div>
         ))}
@@ -178,39 +184,39 @@ const DesktopChatMock = () => (
     {/* 右侧主聊天区 */}
     <div className="flex-1 flex flex-col bg-[#f5f5f5]">
       {/* 顶部标题栏 */}
-      <div className="h-16 border-b border-[#e6e6e6] flex items-center px-6 shrink-0 justify-between">
-        <div className="text-[18px] font-medium text-gray-900">AI 前沿资讯速递(28)</div>
-        <div className="flex gap-5 text-gray-500 cursor-pointer hover:text-gray-700 transition-colors">
-           <MoreHorizontal className="w-6 h-6" />
+      <div className="h-12 border-b border-[#e6e6e6] flex items-center px-4 shrink-0 justify-between">
+        <div className="text-[14px] font-medium text-gray-900">AI 前沿资讯速递(28)</div>
+        <div className="flex gap-4 text-gray-500 cursor-pointer hover:text-gray-700 transition-colors">
+           <MoreHorizontal className="w-4 h-4" />
         </div>
       </div>
       
       {/* 聊天内容区 */}
-      <div className="flex-1 overflow-auto p-6 space-y-8">
+      <div className="flex-1 overflow-auto p-4 space-y-6">
         <div className="text-center">
-          <span className="text-[12px] text-gray-400">昨天 21:52</span>
+          <span className="text-[10px] text-gray-400">昨天 21:52</span>
         </div>
-        <div className="flex gap-4">
-          <div className="w-11 h-11 rounded-md bg-blue-600 flex items-center justify-center shrink-0 shadow-sm">
-            <Bot className="w-7 h-7 text-white" />
+        <div className="flex gap-3">
+          <div className="w-9 h-9 rounded-md bg-blue-600 flex items-center justify-center shrink-0 shadow-sm">
+            <Bot className="w-5 h-5 text-white" />
           </div>
-          <div className="flex-1 max-w-[90%] lg:max-w-[85%]">
-            <div className="text-[13px] text-gray-500 mb-1.5 ml-1">Weave智能助理</div>
-            <div className="bg-white p-6 rounded-2xl rounded-tl-none border border-gray-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-              <div className="text-[15px] text-gray-800 leading-relaxed mb-5">
-                <span className="text-yellow-500 text-base">🌟</span> <span className="font-bold">今日焦点</span> 春节AI营销大战落幕，三大厂总投入超百亿，豆包霸榜8日，元宝重回App Store前十。
+          <div className="flex-1 max-w-[92%] lg:max-w-[88%]">
+            <div className="text-[11px] text-gray-500 mb-1 ml-1">Weave智能助理</div>
+            <div className="bg-white p-5 rounded-2xl rounded-tl-none border border-gray-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+              <div className="text-[13px] text-gray-800 leading-relaxed mb-4">
+                <span className="text-yellow-500 text-sm">🌟</span> <span className="font-bold">今日焦点</span> 春节AI营销大战落幕，三大厂总投入超百亿，豆包霸榜8日，元宝重回App Store前十。
               </div>
               
-              <div className="w-full h-px bg-gray-100 mb-5"></div>
+              <div className="w-full h-px bg-gray-100 mb-4"></div>
 
-              <div className="text-[16px] font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <div className="text-[14px] font-bold text-gray-900 mb-3 flex items-center gap-1.5">
                 1. 📱 竞品动态
               </div>
               
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <div>
-                  <div className="text-[14px] font-bold text-gray-800 mb-3 inline-block">CN 移动 AI 赛道</div>
-                  <ul className="list-disc pl-6 text-[14px] text-gray-700 space-y-3 leading-relaxed marker:text-gray-400">
+                  <div className="text-[12px] font-bold text-gray-800 mb-2 inline-block">CN 移动 AI 赛道</div>
+                  <ul className="list-disc pl-5 text-[12px] text-gray-700 space-y-2.5 leading-relaxed marker:text-gray-400">
                     <li><span className="font-bold">从“红包狂欢”到“办公利器” 腾讯元宝重回苹果应用商店榜单前10</span> 腾讯元宝从红包功能转型为办公工具，重回苹果应用商店榜单前十。 <span className="text-blue-500 cursor-pointer hover:underline">链接</span></li>
                     <li><span className="font-bold">三大AI春节烧掉近百亿后：豆包霸榜8日，千问第二，元宝重回前十</span> 春节期间AI应用竞争激烈，豆包、千问、元宝表现突出，总投入超百亿。 <span className="text-blue-500 cursor-pointer hover:underline">链接</span></li>
                     <li><span className="font-bold">元宝、千问、豆包：烧完40亿后，留下了什么？</span> 分析三大AI应用投入巨资后的成果与市场表现。 <span className="text-blue-500 cursor-pointer hover:underline">链接</span></li>
@@ -221,8 +227,8 @@ const DesktopChatMock = () => (
                 </div>
                 
                 <div>
-                  <div className="text-[14px] font-bold text-gray-800 mb-3 mt-5 inline-block">🖨️ 扫描竞品</div>
-                  <ul className="list-disc pl-6 text-[14px] text-gray-700 space-y-3 leading-relaxed marker:text-gray-400">
+                  <div className="text-[12px] font-bold text-gray-800 mb-2 mt-4 inline-block">🖨️ 扫描竞品</div>
+                  <ul className="list-disc pl-5 text-[12px] text-gray-700 space-y-2.5 leading-relaxed marker:text-gray-400">
                     <li><span className="font-bold">腾讯元宝“骂人”再上热搜 AI情绪失控为哪般？</span> 腾讯元宝出现情绪控制问题，引发用户关注。 <span className="text-blue-500 cursor-pointer hover:underline">链接</span></li>
                     <li><span className="font-bold">腾讯元宝致歉拜年海报出现“脏话”：模型异常输出导致，已紧急校正并优化</span> 元宝出现异常输出，已紧急校正并优化模型。 <span className="text-blue-500 cursor-pointer hover:underline">链接</span></li>
                     <li><span className="font-bold">阶跃星辰杀入季后赛，强势跻身AI“新六小虎”第一梯队</span> 阶跃星辰在AI领域表现突出，跻身第一梯队。 <span className="text-blue-500 cursor-pointer hover:underline">链接</span></li>
@@ -235,14 +241,14 @@ const DesktopChatMock = () => (
       </div>
       
       {/* 底部输入框 */}
-      <div className="h-[160px] bg-white border-t border-[#e6e6e6] flex flex-col shrink-0">
-        <div className="h-12 flex items-center px-5 gap-6 text-gray-500">
-          <Smile className="w-[20px] h-[20px] cursor-pointer hover:text-gray-700 transition-colors" />
-          <Folder className="w-[20px] h-[20px] cursor-pointer hover:text-gray-700 transition-colors" />
-          <Scissors className="w-[20px] h-[20px] cursor-pointer hover:text-gray-700 transition-colors" />
-          <MessageSquare className="w-[20px] h-[20px] cursor-pointer hover:text-gray-700 transition-colors" />
+      <div className="h-[140px] bg-white border-t border-[#e6e6e6] flex flex-col shrink-0">
+        <div className="h-10 flex items-center px-4 gap-5 text-gray-500">
+          <Smile className="w-[18px] h-[18px] cursor-pointer hover:text-gray-700 transition-colors" />
+          <Folder className="w-[18px] h-[18px] cursor-pointer hover:text-gray-700 transition-colors" />
+          <Scissors className="w-[18px] h-[18px] cursor-pointer hover:text-gray-700 transition-colors" />
+          <MessageSquare className="w-[18px] h-[18px] cursor-pointer hover:text-gray-700 transition-colors" />
         </div>
-        <div className="flex-1 px-5 outline-none text-[14px] text-gray-400">
+        <div className="flex-1 px-4 outline-none text-[12px] text-gray-400">
           输入关键字或问题...
         </div>
       </div>
