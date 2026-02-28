@@ -40,7 +40,7 @@ const ChatMock = () => (
 );
 
 // --- iPhone 设备框（超精细拟真）---
-function iPhoneFrame() {
+function IPhoneFrame() {
   return (
     <div className="relative w-[280px] h-[580px] rounded-[3.5rem] p-3 bg-gradient-to-br from-[#d9d9d9] via-[#8a8a8a] to-[#3a3a3a] shadow-[0_20px_40px_rgba(0,0,0,0.4),inset_0_0_0_1px_rgba(255,255,255,0.4)] flex-shrink-0">
       <div className="w-full h-full rounded-[3rem] bg-black p-2 relative overflow-hidden shadow-[inset_0_0_0_1px_rgba(255,255,255,0.2)]">
@@ -278,7 +278,7 @@ function ProductShapeSection({ style }: { style?: React.CSSProperties }) {
           {/* iPhone：右侧、叠在前层，用负 margin 与 MacBook 重叠 */}
           <div className="relative z-20 flex-shrink-0 order-2 -rotate-2 ml-[-60px] sm:ml-[-80px] md:ml-[-100px] mb-2 sm:mb-0">
             <div className="scale-[0.75] sm:scale-90 md:scale-95 origin-bottom">
-              <iPhoneFrame />
+              <IPhoneFrame />
             </div>
           </div>
         </motion.div>
