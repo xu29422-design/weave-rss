@@ -367,6 +367,7 @@ export interface PushLog {
     channelCount?: number;
     successCount?: number;
     partCount?: number;
+    pushPending?: boolean;
   };
 }
 
