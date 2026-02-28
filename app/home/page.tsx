@@ -11,44 +11,44 @@ import { motion, useScroll, useTransform, type MotionValue } from "framer-motion
 const ChatMock = () => (
   <div className="h-full flex flex-col bg-[#1f2937] font-sans text-[#e5e7eb]">
     {/* Header */}
-    <div className="h-24 bg-[#374151] border-b border-white/5 flex items-end pb-4 px-6 gap-3 shrink-0 shadow-sm relative z-10">
-      <div className="w-3.5 h-3.5 rounded-full bg-green-500 mb-1.5 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
-      <span className="text-[22px] font-bold text-white/95 tracking-tight">Weave 协作群</span>
+    <div className="h-14 bg-[#374151] border-b border-white/5 flex items-end pb-3 px-5 gap-2 shrink-0 shadow-sm relative z-10">
+      <div className="w-2 h-2 rounded-full bg-green-500 mb-1 shadow-[0_0_6px_rgba(34,197,94,0.5)]" />
+      <span className="text-[13px] font-bold text-white/95 tracking-tight">Weave 协作群</span>
     </div>
     
-    <div className="flex-1 p-6 space-y-6 overflow-hidden relative">
+    <div className="flex-1 p-3.5 space-y-3.5 overflow-hidden relative">
       {/* Background decorations for ultra-premium look */}
-      <div className="absolute top-10 left-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute top-5 left-5 w-24 h-24 bg-blue-500/10 rounded-full blur-xl pointer-events-none"></div>
       
-      <div className="flex gap-4 relative z-10">
-        <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-blue-500 to-cyan-400 flex items-center justify-center shrink-0 shadow-md">
-          <Bot className="w-6 h-6 text-white" />
+      <div className="flex gap-2.5 relative z-10">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-cyan-400 flex items-center justify-center shrink-0 shadow-md">
+          <Bot className="w-4 h-4 text-white" />
         </div>
-        <div className="space-y-3 max-w-[85%]">
-          <div className="text-[16px] text-white/50 ml-1 font-medium">AI 情报助理</div>
-          <div className="bg-[#374151]/80 backdrop-blur-md p-4 rounded-3xl rounded-tl-sm border border-white/10 text-[18px] text-blue-50 leading-relaxed shadow-lg">
+        <div className="space-y-1.5 max-w-[85%]">
+          <div className="text-[10px] text-white/50 ml-1 font-medium">AI 情报助理</div>
+          <div className="bg-[#374151]/80 backdrop-blur-md p-2.5 rounded-2xl rounded-tl-sm border border-white/10 text-[11px] text-blue-50 leading-relaxed shadow-lg">
             今日为您聚合了 <span className="text-blue-300 font-bold">12 条</span> 高价值情报，已同步到多维表格。
           </div>
           
-          <div className="bg-gradient-to-b from-[#1e293b] to-[#111827] rounded-2xl overflow-hidden shadow-xl border border-white/10 mt-2">
-            <div className="h-20 bg-gradient-to-r from-blue-600/90 to-indigo-600/90 p-5 flex flex-col justify-end relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-bl-full"></div>
-              <div className="text-[13px] font-bold text-blue-200/90 uppercase tracking-widest mb-1 relative z-10">Daily Digest</div>
-              <div className="text-[22px] font-bold text-white leading-tight relative z-10">AI 行业深度观察</div>
+          <div className="bg-gradient-to-b from-[#1e293b] to-[#111827] rounded-xl overflow-hidden shadow-xl border border-white/10 mt-1">
+            <div className="h-[46px] bg-gradient-to-r from-blue-600/90 to-indigo-600/90 p-3 flex flex-col justify-end relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-12 h-12 bg-white/10 rounded-bl-full"></div>
+              <div className="text-[8px] font-bold text-blue-200/90 uppercase tracking-widest mb-0.5 relative z-10">Daily Digest</div>
+              <div className="text-[13px] font-bold text-white leading-tight relative z-10">AI 行业深度观察</div>
             </div>
-            <div className="p-5 space-y-4 relative z-10">
-              <div className="space-y-4">
-                <div className="flex gap-3 items-start bg-white/5 p-3 rounded-lg border border-white/5 shadow-inner">
-                  <div className="w-2 h-2 rounded-full bg-blue-400 mt-2 shrink-0 shadow-[0_0_8px_rgba(96,165,250,0.8)]"></div>
-                  <div className="text-[17px] text-gray-200 leading-relaxed font-medium">DeepSeek MoE 架构更新，多项指标大幅提升。</div>
+            <div className="p-3 space-y-2 relative z-10">
+              <div className="space-y-2">
+                <div className="flex gap-2 items-start bg-white/5 p-2 rounded-md border border-white/5 shadow-inner">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1 shrink-0 shadow-[0_0_4px_rgba(96,165,250,0.8)]"></div>
+                  <div className="text-[11px] text-gray-200 leading-relaxed font-medium">DeepSeek MoE 架构更新，多项指标大幅提升。</div>
                 </div>
-                <div className="flex gap-3 items-start bg-white/5 p-3 rounded-lg border border-white/5 shadow-inner">
-                  <div className="w-2 h-2 rounded-full bg-blue-400 mt-2 shrink-0 shadow-[0_0_8px_rgba(96,165,250,0.8)]"></div>
-                  <div className="text-[17px] text-gray-200 leading-relaxed font-medium">OpenAI AGI 路线图内部备忘录泄露，引发热议。</div>
+                <div className="flex gap-2 items-start bg-white/5 p-2 rounded-md border border-white/5 shadow-inner">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1 shrink-0 shadow-[0_0_4px_rgba(96,165,250,0.8)]"></div>
+                  <div className="text-[11px] text-gray-200 leading-relaxed font-medium">OpenAI AGI 路线图内部备忘录泄露，引发热议。</div>
                 </div>
-                <div className="flex gap-3 items-start bg-white/5 p-3 rounded-lg border border-white/5 shadow-inner">
-                  <div className="w-2 h-2 rounded-full bg-blue-400 mt-2 shrink-0 shadow-[0_0_8px_rgba(96,165,250,0.8)]"></div>
-                  <div className="text-[17px] text-gray-200 leading-relaxed font-medium">苹果发布新一代 M 系列芯片，AI 算力翻倍。</div>
+                <div className="flex gap-2 items-start bg-white/5 p-2 rounded-md border border-white/5 shadow-inner">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1 shrink-0 shadow-[0_0_4px_rgba(96,165,250,0.8)]"></div>
+                  <div className="text-[11px] text-gray-200 leading-relaxed font-medium">苹果发布新一代 M 系列芯片，AI 算力翻倍。</div>
                 </div>
               </div>
             </div>
@@ -58,9 +58,9 @@ const ChatMock = () => (
     </div>
     
     {/* 底部输入框填充空白 */}
-    <div className="h-[90px] bg-[#374151]/90 backdrop-blur-md border-t border-white/5 flex items-center px-6 shrink-0 relative z-10">
-      <div className="w-full h-12 bg-[#1f2937] rounded-full border border-white/10 flex items-center px-5 text-white/40 text-[16px] shadow-inner">
-        <Smile className="w-6 h-6 mr-3 text-white/40" />
+    <div className="h-[60px] pb-3 bg-[#374151]/90 backdrop-blur-md border-t border-white/5 flex items-center px-4 shrink-0 relative z-10">
+      <div className="w-full h-8 bg-[#1f2937] rounded-full border border-white/10 flex items-center px-3 text-white/40 text-[11px] shadow-inner mt-1">
+        <Smile className="w-4 h-4 mr-2 text-white/40" />
         输入关键字或问题...
       </div>
     </div>
@@ -80,12 +80,9 @@ function IPhoneFrame() {
           <div className="w-1.5 h-1.5 rounded-full bg-[#111] shadow-[inset_0_0_2px_rgba(255,255,255,0.2)]"></div>
           <div className="w-1.5 h-1.5 rounded-full bg-[#111] shadow-[inset_0_0_2px_rgba(255,255,255,0.2)]"></div>
         </div>
-        {/* 屏幕内容：按照真实的 iPhone 逻辑分辨率 430x932 渲染，精确缩放填满，消除所有缝隙 */}
+        {/* 屏幕内容：采用 1:1 原生尺寸渲染，解决字体模糊问题 */}
         <div className="w-full h-full bg-[#1f2937] rounded-[2.8rem] overflow-hidden relative shadow-inner">
-          <style dangerouslySetInnerHTML={{ __html: `
-            .iphone-screen-content { transform: scale(0.56279); }
-          `}} />
-          <div className="iphone-screen-content absolute top-0 left-0 w-[430px] h-[932px] origin-top-left bg-[#1f2937]">
+          <div className="absolute inset-0 bg-[#1f2937]">
             <ChatMock />
           </div>
         </div>
