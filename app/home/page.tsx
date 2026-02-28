@@ -257,7 +257,7 @@ function MacBookFrame() {
 }
 
 // --- 产品形态图例 Section：Mac 左 + iPhone 右（flex 布局保证两者都可见）---
-function ProductShapeSection({ style }: { style?: React.CSSProperties & { y?: MotionValue<number> } }) {
+function ProductShapeSection({ style }: { style?: React.CSSProperties | { y?: MotionValue<number> } }) {
   return (
     <section className="relative z-10 pt-4 pb-20 md:pt-10 md:pb-32 -mt-8 md:-mt-16">
       <div className="max-w-[1200px] mx-auto relative z-10 px-4">
