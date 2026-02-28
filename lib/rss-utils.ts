@@ -4,7 +4,9 @@ import { saveRawRSSItems } from "@/lib/redis";
 import { subHours, isAfter } from "date-fns";
 import crypto from "crypto";
 
-const parser = new Parser();
+const parser = new Parser({
+  timeout: 15000, // 15秒超时，防止个别源挂起导致 Vercel Serverless 超时
+});
 
 export interface RawRSSItem {
   title: string;

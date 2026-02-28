@@ -18,8 +18,8 @@ const CATEGORY_MAP: Record<string, string> = {
 const ITEMS_PER_BATCH = 40;
 /** 预筛选上限，最多保留两批的量 */
 const FILTER_TOP_LIMIT = 80;
-/** 单步内最多分析条数（免费套餐 60s 上限，5 条约 30s 内更安全） */
-const ANALYZE_CHUNK_SIZE = 5;
+/** 单步内最多分析条数（免费套餐 60s 上限，3 条约 15-30s 内更安全，防止 Vercel 超时） */
+const ANALYZE_CHUNK_SIZE = 3;
 
 /**
  * 智能延迟函数：智谱需要更长的间隔
@@ -121,13 +121,27 @@ export const digestWorker = inngest.createFunction(
         return { status: "skipped", reason: "Missing config" };
       }
 
-      const newItems = await step.run("fetch-and-dedupe", async () => {
-        await setDigestRunStatus(userId, { status: "running", progress: 10, message: "RSS 抓取中" });
-        const superKeyword = useSuperSub ? settings?.superSubKeyword : undefined;
-        const items = await fetchNewItems(userId, rssSources, superKeyword);
-        await setDigestRunStatus(userId, { status: "running", progress: 20, message: "RSS 抓取完成" });
-        return items;
-      });
+      const FETCH_CHUNK_SIZE = 10;
+      let newItems: any[] = [];
+      const superKeyword = useSuperSub ? settings?.superSubKeyword : undefined;
+      
+      await setDigestRunStatus(userId, { status: "running", progress: 10, message: "RSS 抓取中" });
+      
+      for (let i = 0; i < rssSources.length; i += FETCH_CHUNK_SIZE) {
+        const chunkUrls = rssSources.slice(i, i + FETCH_CHUNK_SIZE);
+        const partIndex = Math.floor(i / FETCH_CHUNK_SIZE);
+        
+        const chunkItems = await step.run(`fetch-batch-${partIndex}`, async () => {
+          return await fetchNewItems(userId, chunkUrls, superKeyword);
+        });
+        
+        newItems.push(...chunkItems);
+        
+        // 更新进度
+        const currentCount = Math.min(i + FETCH_CHUNK_SIZE, rssSources.length);
+        const progress = Math.min(20, 10 + Math.floor((currentCount / rssSources.length) * 10));
+        await setDigestRunStatus(userId, { status: "running", progress, message: `RSS 抓取中 (${currentCount}/${rssSources.length})` });
+      }
 
       if (newItems.length === 0) {
         await setDigestRunStatus(userId, { status: "success", progress: 100, message: "暂无新内容", finishedAt: new Date().toISOString() });
@@ -174,27 +188,39 @@ export const digestWorker = inngest.createFunction(
       analyzedBatches.push(parts.flat());
     }
 
-    // 每批分别：TLDR + 聚合报告（一次 AI 将整批聚成 3～6 个主题段，每段标题+内容+链接）
-    const batchResults: { tldr: string; sections: { category: string; content: string }[]; highQualityItems: any[] }[] = [];
-    for (let i = 0; i < analyzedBatches.length; i++) {
-      const highQualityItems = analyzedBatches[i];
-      const tldr = await step.run(`generate-tldr-batch-${i}`, async () => {
-        await setDigestRunStatus(userId, { status: "running", progress: 52 + i * 6, message: "正在生成简报…" });
-        if (highQualityItems.length === 0) return "🌟 **今日焦点**\n\n本批暂无高价值行业动态。";
-        return (await generateTLDR(highQualityItems.map((j) => j.summary).join("\n"), settings!)) ||
-          "🌟 **今日焦点**\n\n已抓取 " + highQualityItems.length + " 篇资讯。";
-      });
-      const { sections } = await step.run(`generate-consolidated-batch-${i}`, async () => {
-        await setDigestRunStatus(userId, { status: "running", progress: 60 + i * 4, message: "正在聚合主题与撰写…" });
-        if (highQualityItems.length === 0) return { sections: [] as { category: string; content: string }[] };
-        return generateConsolidatedReport(
-          highQualityItems.map((j) => ({ title: j.title, summary: j.summary, link: j.link, category: j.category })),
-          settings!
-        );
-      });
-      await setDigestRunStatus(userId, { status: "running", progress: 68 + i * 4, message: "简报内容已就绪，正在准备推送…" });
-      batchResults.push({ tldr, sections: sections || [], highQualityItems });
-    }
+      // 分批进行 TLDR 和聚合报告生成，避免这两步也因为内容过多导致单步超时
+      const batchResults: { tldr: string; sections: { category: string; content: string }[]; highQualityItems: any[] }[] = [];
+      for (let i = 0; i < analyzedBatches.length; i++) {
+        const highQualityItems = analyzedBatches[i];
+        
+        // 提取 summary 时控制长度，防止单次输入过长导致请求变慢
+        const summaryText = highQualityItems.map((j) => j.summary).join("\n").substring(0, 15000); 
+        
+        const tldr = await step.run(`generate-tldr-batch-${i}`, async () => {
+          await setDigestRunStatus(userId, { status: "running", progress: 52 + i * 6, message: "正在生成简报…" });
+          if (highQualityItems.length === 0) return "🌟 **今日焦点**\n\n本批暂无高价值行业动态。";
+          return (await generateTLDR(summaryText, settings!)) ||
+            "🌟 **今日焦点**\n\n已抓取 " + highQualityItems.length + " 篇资讯。";
+        });
+        
+        // 如果批次内项目很多，也可以考虑分段处理，目前 ITEMS_PER_BATCH 最大 40，一次发给聚合报告一般还是可以承受的
+        const { sections } = await step.run(`generate-consolidated-batch-${i}`, async () => {
+          await setDigestRunStatus(userId, { status: "running", progress: 60 + i * 4, message: "正在聚合主题与撰写…" });
+          if (highQualityItems.length === 0) return { sections: [] as { category: string; content: string }[] };
+          
+          // 截断超长 summary，防止 Prompt 溢出导致拒绝服务或响应极慢
+          const itemsForReport = highQualityItems.map((j) => ({ 
+            title: j.title, 
+            summary: j.summary ? j.summary.substring(0, 500) : "", 
+            link: j.link, 
+            category: j.category 
+          }));
+          
+          return generateConsolidatedReport(itemsForReport, settings!);
+        });
+        await setDigestRunStatus(userId, { status: "running", progress: 68 + i * 4, message: "简报内容已就绪，正在准备推送…" });
+        batchResults.push({ tldr, sections: sections || [], highQualityItems });
+      }
     await setDigestRunStatus(userId, { status: "running", progress: 75, message: "正在组装与推送…" });
 
     const finalReport = await step.run("assemble-and-send", async () => {

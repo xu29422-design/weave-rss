@@ -1985,9 +1985,9 @@ function DashboardContent() {
 
                   {/* 自定义 RSS 源（不属于任何主题的） */}
                   {(() => {
-                    const allThemesSources = subscribedThemeIds.flatMap(id => getSourcesForTheme(id));
+                    const allThemesSources = subscribedThemeIds.flatMap(id => getSourcesForTheme(id)).map(u => u.trim());
                     const customRssSources = settings.rssUrls
-                      ? settings.rssUrls.split('\n').filter((url: string) => url && !allThemesSources.includes(url))
+                      ? settings.rssUrls.split('\n').map((u: string) => u.trim()).filter((url: string) => url && !allThemesSources.includes(url))
                       : [];
                     
                     if (customRssSources.length === 0) return null;
