@@ -14,15 +14,20 @@ export async function GET(req: Request) {
 
     const userId = user.userId;
 
-    // 仅清空当前用户的 seen 标记（项目无 next-auth，不提供 all 范围）
+    // 仅清空当前用户的 seen 标记；单次请求限制数量，避免 FUNCTION_INVOCATION_TIMEOUT（Vercel 约 10s）
     const pattern = `user:${userId}:seen:*`;
+    const MAX_ITERATIONS = 10;
+    const KEYS_PER_SCAN = 150;
 
     let cursor = 0;
     let deletedCount = 0;
+    let iterations = 0;
+    let hasMore = false;
 
-    do {
-      const [nextCursor, keys] = await kv.scan(cursor, { match: pattern, count: 100 });
+    while (iterations < MAX_ITERATIONS) {
+      const [nextCursor, keys] = await kv.scan(cursor, { match: pattern, count: KEYS_PER_SCAN });
       cursor = nextCursor;
+      iterations += 1;
 
       if (keys.length > 0) {
         const pipeline = kv.pipeline();
@@ -30,12 +35,19 @@ export async function GET(req: Request) {
         await pipeline.exec();
         deletedCount += keys.length;
       }
-    } while (cursor !== 0);
+
+      if (cursor === 0) break;
+      hasMore = true;
+    }
 
     return NextResponse.json({
       success: true,
-      message: `成功删除了 ${deletedCount} 条抓取历史记录`,
+      message: hasMore
+        ? `已删除 ${deletedCount} 条，还有更多。请再次点击「清空历史」继续。`
+        : `成功删除了 ${deletedCount} 条抓取历史记录`,
       scope: "current_user",
+      deletedCount,
+      hasMore,
     });
   } catch (error: any) {
     console.error("清空历史记录失败:", error);

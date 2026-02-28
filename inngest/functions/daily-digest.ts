@@ -4,7 +4,6 @@ import { fetchNewItems } from "@/lib/rss-utils";
 import { analyzeItem, generateConsolidatedReport, generateTLDR, shortenContent, filterTopItems } from "@/lib/ai-service";
 import { getAllActiveUsers } from "@/lib/auth";
 import { pushDigestToKdocs, getFirstDBSheetId } from "@/lib/kdocs-api";
-import { createWPSDBSheetRecord } from "@/lib/wps-dbsheet-api";
 
 const CATEGORY_MAP: Record<string, string> = {
   'Product': '📱 竞品动态',
@@ -20,6 +19,8 @@ const ITEMS_PER_BATCH = 40;
 const FILTER_TOP_LIMIT = 80;
 /** 单步内最多分析条数（免费套餐 60s 上限，3 条约 15-30s 内更安全，防止 Vercel 超时） */
 const ANALYZE_CHUNK_SIZE = 3;
+/** assemble-and-send 单步最大耗时（毫秒），超时则返回部分结果，避免 FUNCTION_INVOCATION_TIMEOUT 导致 finalization 报错 */
+const ASSEMBLE_STEP_DEADLINE_MS = 52_000;
 
 /**
  * 智能延迟函数：智谱需要更长的间隔
@@ -224,6 +225,7 @@ export const digestWorker = inngest.createFunction(
     await setDigestRunStatus(userId, { status: "running", progress: 75, message: "正在组装与推送…" });
 
     const finalReport = await step.run("assemble-and-send", async () => {
+      const stepStart = Date.now();
       await setDigestRunStatus(userId, { status: "running", progress: 90, message: "内容推送中" });
       console.log("=== 开始组装简报 ===");
 
@@ -268,6 +270,10 @@ export const digestWorker = inngest.createFunction(
 
       // 按批组装并推送（一批一条消息；两批则推送「今日简报（上）」「今日简报（下）」）
       for (let partIndex = 0; partIndex < batchResults.length; partIndex++) {
+        if (Date.now() - stepStart > ASSEMBLE_STEP_DEADLINE_MS) {
+          console.warn("⏱️ assemble-and-send 即将超时，跳过剩余批次");
+          break;
+        }
         const { tldr, sections, highQualityItems } = batchResults[partIndex];
         const partTitle = batchResults.length > 1 ? (partIndex === 0 ? "今日简报（上）" : "今日简报（下）") : "AI 行业简报";
 
@@ -296,6 +302,11 @@ export const digestWorker = inngest.createFunction(
         allHighQualityItems.push(...highQualityItems);
 
         for (const [channelId, { channel, isPrimary }] of Array.from(channelsToPush.entries())) {
+        if (Date.now() - stepStart > ASSEMBLE_STEP_DEADLINE_MS) {
+          console.warn("⏱️ assemble-and-send 即将超时，跳过剩余渠道");
+          pushResults.channels[channelId] = { success: false, type: channel.type, name: channel.name, error: "步骤超时未推送" };
+          break;
+        }
         try {
           if (channel.type === 'webhook' && channel.webhookUrl) {
             // 推送到 Webhook
@@ -386,68 +397,9 @@ export const digestWorker = inngest.createFunction(
               pushResults.channels[channelId] = { success: false, type: 'kdocs', name: channel.name, error: kdocsResult.error };
             }
           } else if (channel.type === 'wps-dbsheet') {
-            // 推送到 WPS 多维表格
-            console.log(`=== 推送到 WPS 多维表格 ${channel.name} (${isPrimary ? '主渠道' : '辅助渠道'}) ===`);
-            
-            if (!channel.wpsAppId || !channel.wpsAppSecret || !channel.wpsFileToken || !channel.wpsTableId) {
-              console.error(`❌ WPS 多维表格 ${channel.name} 配置不完整`);
-              pushResults.channels[channelId] = { success: false, type: 'wps-dbsheet', name: channel.name, error: '配置不完整' };
-              continue;
-            }
-
-            // 将简报内容推送到 WPS 多维表格
-            // 每条高质量内容作为一条记录
-            const wpsResults = [];
-            for (const item of highQualityItems) {
-              try {
-                const wpsResult = await createWPSDBSheetRecord(
-                  channel.wpsAppId,
-                  channel.wpsAppSecret,
-                  channel.wpsFileToken,
-                  channel.wpsTableId,
-                  {
-                    '标题': item.title || '无标题',
-                    '内容': item.summary || '',
-                    '摘要': item.summary || tldr || '',
-                    '来源': item.link || '',
-                    '分类': item.category || '未分类',
-                    '质量分数': item.score || 0,
-                    '发布时间': new Date().toISOString(),
-                    '导入时间': new Date().toISOString(),
-                  }
-                );
-
-                if (wpsResult.success) {
-                  wpsResults.push({ success: true, recordId: wpsResult.recordId });
-                } else {
-                  wpsResults.push({ success: false, error: wpsResult.error });
-                }
-              } catch (error: any) {
-                console.error(`❌ 推送单条记录到 WPS 多维表格失败:`, error);
-                wpsResults.push({ success: false, error: error.message });
-              }
-            }
-
-            const successCount = wpsResults.filter(r => r.success).length;
-            if (successCount > 0) {
-              console.log(`✅ 推送到 WPS 多维表格 ${channel.name} 成功！成功 ${successCount}/${highQualityItems.length} 条记录`);
-              pushResults.channels[channelId] = { 
-                success: true, 
-                type: 'wps-dbsheet', 
-                name: channel.name, 
-                successCount,
-                totalCount: highQualityItems.length
-              };
-            } else {
-              console.error(`❌ 推送到 WPS 多维表格 ${channel.name} 失败: 所有记录推送失败`);
-              pushResults.channels[channelId] = { 
-                success: false, 
-                type: 'wps-dbsheet', 
-                name: channel.name, 
-                error: '所有记录推送失败',
-                results: wpsResults
-              };
-            }
+            // WPS 多维表：不在推送时写入。用户在多维表侧通过 API（如 /api/digest/latest）主动拉取已有简报数据。
+            console.log(`ℹ️ WPS 多维表格 ${channel.name}：由用户通过 API 主动拉取数据，此处不写入`);
+            pushResults.channels[channelId] = { success: true, type: 'wps-dbsheet', name: channel.name, skipped: true, reason: '由多维表侧 API 主动拉取' };
           }
         } catch (error: any) {
           console.error(`❌ 推送到 ${channel.name} 异常:`, error);
