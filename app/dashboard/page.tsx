@@ -2027,39 +2027,39 @@ function DashboardContent() {
                     return (
                       <div className="break-inside-avoid relative flex flex-col">
                         <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-white/30 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5">
-                          <div className="flex items-center justify-between mb-8">
-                            <div className="flex items-center gap-4">
-                              <div className="p-3.5 bg-white/10 rounded-2xl text-blue-300 border border-white/10 group-hover:bg-white group-hover:text-blue-950 transition-all duration-500">
-                                <Plus className="w-5 h-5" />
+                            <div className="flex items-start justify-between mb-8 gap-2">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-white/10 rounded-2xl text-blue-300 border border-white/10 group-hover:bg-white group-hover:text-blue-950 transition-all duration-500 shrink-0">
+                                  <Plus className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <h3 className="text-lg font-black text-white font-serif truncate">{settings.projectName?.trim() || "自定义源"}</h3>
+                                  <p className="text-[10px] text-blue-100/80 font-bold uppercase tracking-widest mt-1">{customRssSources.length} 个信源</p>
+                                </div>
                               </div>
-                              <div>
-                                <h3 className="text-xl font-black text-white font-serif">{settings.projectName?.trim() || "自定义源"}</h3>
-                                <p className="text-xs text-blue-100/80 font-bold uppercase tracking-widest mt-1">{customRssSources.length} 个信源</p>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push("/onboarding?mode=edit");
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-blue-300 bg-blue-500/20 border border-blue-500/40 hover:bg-blue-500/30 hover:border-blue-400/50 transition-all shadow-[0_0_12px_rgba(59,130,246,0.25)]"
+                                  title="编辑配置与源"
+                                >
+                                  编辑/新增源
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleClearCustomSources}
+                                  className="p-1.5 rounded-lg text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                  title="清空自定义源"
+                                  aria-label="清空自定义源"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push("/onboarding?mode=edit");
-                                }}
-                                className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest text-blue-300 bg-blue-500/20 border border-blue-500/40 hover:bg-blue-500/30 hover:border-blue-400/50 transition-all shadow-[0_0_12px_rgba(59,130,246,0.25)]"
-                                title="编辑配置与源"
-                              >
-                                编辑/新增源
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleClearCustomSources}
-                                className="p-2 rounded-lg text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                                title="清空自定义源"
-                                aria-label="清空自定义源"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
                           
                           <div className="space-y-3">
                             {customRssSources.slice(0, 5).map((url: string, idx: number) => (
