@@ -2037,15 +2037,28 @@ function DashboardContent() {
                                 <p className="text-xs text-blue-100/80 font-bold uppercase tracking-widest mt-1">{customRssSources.length} 个信源</p>
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={handleClearCustomSources}
-                              className="p-2 rounded-lg text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                              title="清空自定义源"
-                              aria-label="清空自定义源"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push("/onboarding?mode=edit");
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest text-blue-300 bg-blue-500/20 border border-blue-500/40 hover:bg-blue-500/30 hover:border-blue-400/50 transition-all shadow-[0_0_12px_rgba(59,130,246,0.25)]"
+                                title="编辑配置与源"
+                              >
+                                编辑/新增源
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleClearCustomSources}
+                                className="p-2 rounded-lg text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                title="清空自定义源"
+                                aria-label="清空自定义源"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                           
                           <div className="space-y-3">
