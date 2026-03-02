@@ -59,12 +59,12 @@ function AuthContent() {
         return;
       }
 
-      if (safeRedirect || data.redirectTo) {
-        router.push(safeRedirect || data.redirectTo);
+      if (mode === "register") {
+        router.push(data.redirectTo || "/onboarding");
+      } else if (safeRedirect) {
+        router.push(safeRedirect);
       } else {
-        // 注册后进入新手引导；登录后进入已订阅
-        const targetPath = mode === "register" ? "/onboarding" : "/dashboard?tab=active";
-        router.push(targetPath);
+        router.push("/dashboard?tab=active");
       }
       router.refresh();
     } catch (err: any) {

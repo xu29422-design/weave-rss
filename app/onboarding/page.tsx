@@ -32,6 +32,7 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Step 1: 选中的推荐 RSS id 列表 + 自定义 URL 多行
   const [selectedRssIds, setSelectedRssIds] = useState<string[]>([]);
@@ -62,6 +63,7 @@ export default function OnboardingPage() {
   const [initialSettings, setInitialSettings] = useState<Record<string, any>>({});
 
   useEffect(() => {
+    setIsEditMode(window.location.search.includes("mode=edit"));
     (async () => {
       const data = await fetchCurrentConfig();
       setAuthenticated(data.authenticated);
@@ -300,7 +302,7 @@ export default function OnboardingPage() {
         >
           <span className="font-serif font-black text-white">Weave</span>
           <span className="text-2xl font-black text-white font-serif">
-            新手引导 {step}/5
+            {isEditMode ? `修改配置 ${step}/${STEPS.length}` : `新手引导 ${step}/${STEPS.length}`}
           </span>
         </button>
       </header>

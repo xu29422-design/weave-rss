@@ -1685,21 +1685,38 @@ function DashboardContent() {
                 </div>
               </div>
 
-              <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
+              {/* 使用普通 flex 布局替代瀑布流 */}
+              <div className="flex flex-col md:flex-row flex-wrap items-stretch justify-start gap-6">
+                {/* 自由配置入口 */}
+                <div 
+                  onClick={() => router.push("/onboarding?mode=edit")}
+                  className="w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] shrink-0 cursor-pointer group"
+                >
+                  <div className="relative bg-white/5 rounded-[40px] p-8 border-2 border-dashed border-white/10 hover:border-blue-400/50 hover:bg-blue-500/10 transition-all duration-500 flex flex-col items-center justify-center text-center h-[320px] space-y-6 backdrop-blur-md">
+                    <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 shadow-lg flex items-center justify-center text-white/60 group-hover:text-blue-300 group-hover:scale-110 transition-all duration-500">
+                      <Plus className="w-8 h-8" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-white font-serif italic">自由配置模式</h3>
+                      <p className="text-sm text-blue-100/50 mt-2 font-bold uppercase tracking-widest">自定义您的专属情报流</p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* 超级订阅入口：Google News 检索 */}
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="break-inside-avoid group relative flex flex-col"
+                  className="w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] shrink-0 group relative flex flex-col"
                 >
                   <div 
                     onClick={() => setIsSuperSubModalOpen(true)}
-                    className="relative bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-[40px] p-8 shadow-2xl border-2 border-blue-400/30 hover:border-blue-400 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/10 cursor-pointer overflow-hidden"
+                    className="relative bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-[40px] p-8 shadow-2xl border-2 border-blue-400/30 hover:border-blue-400 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/10 cursor-pointer overflow-hidden h-full min-h-[320px]"
                   >
                     <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
                       <Globe className="w-32 h-32 rotate-12" />
                     </div>
-                    <div className="relative z-10">
+                    <div className="relative z-10 flex flex-col h-full">
                       <div className="flex items-center gap-4 mb-6">
                         <div className="p-4 bg-blue-500 text-white rounded-2xl shadow-lg shadow-blue-500/20">
                           <Search className="w-6 h-6" />
@@ -1707,10 +1724,10 @@ function DashboardContent() {
                         <h3 className="text-2xl font-black text-white font-serif italic">超级订阅</h3>
                       </div>
                       <p className="text-lg font-bold text-white mb-4">输入你最想看的内容</p>
-                      <p className="text-sm text-blue-100/60 leading-relaxed mb-8">
+                      <p className="text-sm text-blue-100/60 leading-relaxed mb-8 flex-1">
                         告诉我们您最想关注的主题，我们将围绕这个主题帮你额外搜集信息
                       </p>
-                      <div className="flex items-center gap-2 text-blue-400 font-black text-xs uppercase tracking-[0.2em]">
+                      <div className="flex items-center gap-2 text-blue-400 font-black text-xs uppercase tracking-[0.2em] mt-auto">
                         立即开启专属检索 <ArrowRight className="w-4 h-4" />
                       </div>
                     </div>
@@ -1723,9 +1740,9 @@ function DashboardContent() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: index * 0.05 }}
-                    className="break-inside-avoid group relative flex flex-col"
+                    className="w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] shrink-0 group relative flex flex-col"
                   >
-                    <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-blue-400/30 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5">
+                    <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-blue-400/30 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5 h-full flex flex-col">
                       {/* 头部信息 */}
                       <div className="flex items-center justify-between mb-8">
                         <div className="flex items-center gap-4">
@@ -1747,7 +1764,7 @@ function DashboardContent() {
                         <ThemePreview theme={theme} />
                       </div>
 
-                      <p className="text-sm text-blue-100/80 font-medium leading-relaxed">
+                      <p className="text-sm text-blue-100/80 font-medium leading-relaxed flex-1">
                         {theme.desc}
                       </p>
 
@@ -1773,22 +1790,6 @@ function DashboardContent() {
                     </div>
                   </motion.div>
                 ))}
-                
-                {/* 自由配置入口 */}
-                <div 
-                  onClick={() => router.push("/config")}
-                  className="break-inside-avoid cursor-pointer group"
-                >
-                  <div className="relative bg-white/5 rounded-[40px] p-8 border-2 border-dashed border-white/10 hover:border-blue-400/50 hover:bg-blue-500/10 transition-all duration-500 flex flex-col items-center justify-center text-center h-[280px] space-y-6 backdrop-blur-md">
-                    <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 shadow-lg flex items-center justify-center text-white/60 group-hover:text-blue-300 group-hover:scale-110 transition-all duration-500">
-                      <Plus className="w-8 h-8" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-black text-white font-serif italic">自由配置模式</h3>
-                      <p className="text-sm text-blue-100/50 mt-2 font-bold uppercase tracking-widest">自定义您的专属情报流</p>
-                    </div>
-                  </div>
-                </div>
               </div>
             </motion.div>
           )}
