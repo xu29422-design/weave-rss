@@ -1687,52 +1687,56 @@ function DashboardContent() {
 
               {/* 使用普通 grid 布局替代瀑布流，保持从左到右，但使用 items-start 防止拉伸高度 */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
-                {/* 自由配置入口 */}
-                <div 
-                  onClick={() => router.push("/onboarding?mode=edit")}
-                  className="cursor-pointer group"
-                >
-                  <div className="relative bg-white/5 rounded-[40px] p-8 border-2 border-dashed border-white/10 hover:border-blue-400/50 hover:bg-blue-500/10 transition-all duration-500 flex flex-col items-center justify-center text-center h-[280px] space-y-6 backdrop-blur-md">
-                    <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 shadow-lg flex items-center justify-center text-white/60 group-hover:text-blue-300 group-hover:scale-110 transition-all duration-500">
-                      <Plus className="w-8 h-8" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-black text-white font-serif italic">自由配置模式</h3>
-                      <p className="text-sm text-blue-100/50 mt-2 font-bold uppercase tracking-widest">自定义您的专属情报流</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 超级订阅入口：Google News 检索 */}
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="group relative flex flex-col"
-                >
+                
+                {/* 第一列：包含“自由配置模式”和“超级订阅”，通过 flex-col 实现一上一下排列 */}
+                <div className="flex flex-col gap-6">
+                  {/* 自由配置入口 */}
                   <div 
-                    onClick={() => setIsSuperSubModalOpen(true)}
-                    className="relative bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-[40px] p-8 shadow-2xl border-2 border-blue-400/30 hover:border-blue-400 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/10 cursor-pointer overflow-hidden"
+                    onClick={() => router.push("/onboarding?mode=edit")}
+                    className="cursor-pointer group"
                   >
-                    <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                      <Globe className="w-32 h-32 rotate-12" />
-                    </div>
-                    <div className="relative z-10">
-                      <div className="flex items-center gap-4 mb-6">
-                        <div className="p-4 bg-blue-500 text-white rounded-2xl shadow-lg shadow-blue-500/20">
-                          <Search className="w-6 h-6" />
-                        </div>
-                        <h3 className="text-2xl font-black text-white font-serif italic">超级订阅</h3>
+                    <div className="relative bg-white/5 rounded-[40px] p-8 border-2 border-dashed border-white/10 hover:border-blue-400/50 hover:bg-blue-500/10 transition-all duration-500 flex flex-col items-center justify-center text-center h-[240px] space-y-4 backdrop-blur-md">
+                      <div className="w-14 h-14 rounded-full bg-white/5 border border-white/10 shadow-lg flex items-center justify-center text-white/60 group-hover:text-blue-300 group-hover:scale-110 transition-all duration-500">
+                        <Plus className="w-6 h-6" />
                       </div>
-                      <p className="text-lg font-bold text-white mb-4">输入你最想看的内容</p>
-                      <p className="text-sm text-blue-100/60 leading-relaxed mb-8">
-                        告诉我们您最想关注的主题，我们将围绕这个主题帮你额外搜集信息
-                      </p>
-                      <div className="flex items-center gap-2 text-blue-400 font-black text-xs uppercase tracking-[0.2em]">
-                        立即开启专属检索 <ArrowRight className="w-4 h-4" />
+                      <div>
+                        <h3 className="text-xl font-black text-white font-serif italic">自由配置模式</h3>
+                        <p className="text-xs text-blue-100/50 mt-2 font-bold uppercase tracking-widest">自定义您的专属情报流</p>
                       </div>
                     </div>
                   </div>
-                </motion.div>
+
+                  {/* 超级订阅入口：Google News 检索 */}
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="group relative flex flex-col"
+                  >
+                    <div 
+                      onClick={() => setIsSuperSubModalOpen(true)}
+                      className="relative bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-[40px] p-6 shadow-2xl border-2 border-blue-400/30 hover:border-blue-400 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/10 cursor-pointer overflow-hidden h-[264px] flex flex-col"
+                    >
+                      <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Globe className="w-24 h-24 rotate-12" />
+                      </div>
+                      <div className="relative z-10 flex flex-col h-full">
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className="p-3 bg-blue-500 text-white rounded-2xl shadow-lg shadow-blue-500/20">
+                            <Search className="w-5 h-5" />
+                          </div>
+                          <h3 className="text-xl font-black text-white font-serif italic">超级订阅</h3>
+                        </div>
+                        <p className="text-sm font-bold text-white mb-2">输入你最想看的内容</p>
+                        <p className="text-xs text-blue-100/60 leading-relaxed mb-6 flex-1">
+                          告诉我们您最想关注的主题，我们将围绕这个主题帮你额外搜集信息
+                        </p>
+                        <div className="flex items-center gap-2 text-blue-400 font-black text-[10px] uppercase tracking-[0.2em] mt-auto">
+                          立即开启专属检索 <ArrowRight className="w-3 h-3" />
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
 
                 {filteredThemes.map((theme, index) => (
                   <motion.div 
