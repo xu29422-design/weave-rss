@@ -1421,7 +1421,9 @@ function DashboardContent() {
                         {selectedTheme.icon}
                       </div>
                       <div>
-                        <h3 className="text-2xl font-black text-blue-950">输入推送的机器人地址</h3>
+                        <h3 className="text-2xl font-black text-blue-950">
+                          {subscribedThemeIds.includes(selectedTheme.id) ? "修改订阅设置" : "配置订阅与推送"}
+                        </h3>
                         <p className="text-xs text-blue-900/40 font-bold mt-1 uppercase tracking-widest">主题：{selectedTheme.title}</p>
                       </div>
                     </div>
@@ -1442,7 +1444,9 @@ function DashboardContent() {
                         className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-sans text-blue-950 placeholder:text-blue-900/40"
                         autoFocus
                       />
-                      <p className="text-[10px] text-blue-900/40 ml-1 font-medium">首次订阅需配置接收地址，后续可直接复用。</p>
+                      <p className="text-[10px] text-blue-900/40 ml-1 font-medium">
+                        {subscribedThemeIds.includes(selectedTheme.id) ? "提示：此处的推送时间和周期修改会应用到全局。" : "首次订阅需配置接收地址，后续可直接复用。"}
+                      </p>
                     </div>
 
                     {/* 推送时间 */}
@@ -1489,7 +1493,7 @@ function DashboardContent() {
                     {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (
                       <>
                         <CheckCircle2 className="w-6 h-6" />
-                        确认订阅
+                        {subscribedThemeIds.includes(selectedTheme.id) ? "保存设置" : "确认订阅"}
                       </>
                     )}
                   </button>
@@ -1854,7 +1858,7 @@ function DashboardContent() {
                             <div className="p-3.5 bg-white/10 rounded-2xl text-blue-600 border border-white/10 group-hover:bg-white group-hover:text-blue-950 transition-all duration-500">
                               {theme.icon}
                             </div>
-                            <div className="flex-1 cursor-pointer group" onClick={() => handleOpenThemeConfigModal(themeId)}>
+                            <div className="flex-1 cursor-pointer group" onClick={() => openSubscribeModal(theme)}>
                               <div className="flex items-center gap-2">
                                 <h3 className="text-xl font-black text-white font-serif group-hover:text-blue-300 transition-colors">{theme.title}</h3>
                                 {settings.themeConfigs?.[themeId] && (
@@ -1862,7 +1866,7 @@ function DashboardContent() {
                                 )}
                               </div>
                               <p className="text-[10px] text-blue-100/60 mt-1 flex items-center gap-1 group-hover:text-blue-300/80 transition-colors">
-                                点击配置此卡片专属属性 <Settings2 className="w-3 h-3 inline" />
+                                点击配置推送时间与周期 <Clock className="w-3 h-3 inline" />
                               </p>
                             </div>
                           </div>
