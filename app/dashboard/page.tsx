@@ -1854,9 +1854,16 @@ function DashboardContent() {
                             <div className="p-3.5 bg-white/10 rounded-2xl text-blue-600 border border-white/10 group-hover:bg-white group-hover:text-blue-950 transition-all duration-500">
                               {theme.icon}
                             </div>
-                            <div className="flex-1">
-                              <h3 className="text-xl font-black text-white font-serif">{theme.title}</h3>
-                              <p className="text-[10px] text-blue-100/60 mt-0.5">{isExpanded ? "点击「新增源」收起" : "点击「新增源」管理本卡片 RSS 源"}</p>
+                            <div className="flex-1 cursor-pointer group" onClick={() => handleOpenThemeConfigModal(themeId)}>
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-xl font-black text-white font-serif group-hover:text-blue-300 transition-colors">{theme.title}</h3>
+                                {settings.themeConfigs?.[themeId] && (
+                                  <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-[9px] font-black rounded-md uppercase tracking-widest border border-blue-500/30">已独立配置</span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-blue-100/60 mt-1 flex items-center gap-1 group-hover:text-blue-300/80 transition-colors">
+                                点击配置此卡片专属属性 <Settings2 className="w-3 h-3 inline" />
+                              </p>
                             </div>
                           </div>
 
