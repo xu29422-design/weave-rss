@@ -333,11 +333,51 @@ export const digestWorker = inngest.createFunction(
             // 推送到 Webhook
             console.log(`=== 推送到 ${channel.name} (${isPrimary ? '主渠道' : '辅助渠道'}) ===`);
             
+            // WPS 开放平台卡片格式（与官方示例一致）：config + i18n_items；header、elements 在 i18n_items[].value 内。若卡片报 InvalidArgument 会降级为 Markdown 推送。
             const payload = {
-              msgtype: "markdown",
-              markdown: {
-                text: reportContent
-              }
+              msgtype: "card",
+              card: {
+                config: {
+                  shared_card: true,
+                  processing_state: "unprocessed",
+                },
+                i18n_items: [
+                  {
+                    key: "zh-CN",
+                    value: {
+                      header: {
+                        title: { tag: "text", text: { type: "plain", content: "每日简报" } },
+                      },
+                      elements: [
+                        { tag: "markdown", content: reportContent },
+                        { tag: "hr" },
+                        {
+                          tag: "action",
+                          layout: "bisected",
+                          actions: [
+                            {
+                              button: {
+                                tag: "button",
+                                text: { content: "🤖 一键提炼核心观点", type: "plain" },
+                                style: "normal",
+                                key: "action_ai_summarize",
+                              },
+                            },
+                            {
+                              button: {
+                                tag: "button",
+                                text: { content: "📝 提取待办事项", type: "plain" },
+                                style: "normal",
+                                key: "action_ai_todo",
+                              },
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
             };
             
             const response = await fetch(channel.webhookUrl, {
@@ -353,15 +393,34 @@ export const digestWorker = inngest.createFunction(
             } catch (e) {
               result = { raw: responseText };
             }
-            const httpOk = response.status === 200 || response.ok;
-            const bodyOk = result && typeof result.errcode === "number" ? result.errcode === 0 : true;
+            let httpOk = response.status === 200 || response.ok;
+            let bodyOk = result && typeof result.errcode === "number" ? result.errcode === 0 : true;
             if (httpOk && bodyOk) {
               console.log(`✅ 推送到 ${channel.name} 成功！`);
               pushResults.channels[channelId] = { success: true, type: 'webhook', name: channel.name, response: result };
             } else {
-              if (httpOk && !bodyOk) console.error(`❌ 推送到 ${channel.name} 失败（接口返回 errcode）:`, result);
-              else console.error(`❌ 推送到 ${channel.name} 失败:`, result);
-              pushResults.channels[channelId] = { success: false, type: 'webhook', name: channel.name, error: result };
+              console.error(`❌ 卡片推送到 ${channel.name} 失败，尝试降级为 Markdown 推送...`);
+              const markdownPayload = { msgtype: "markdown", markdown: { text: reportContent } };
+              const fallbackRes = await fetch(channel.webhookUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(markdownPayload),
+              });
+              const fallbackText = await fallbackRes.text();
+              let fallbackResult: any;
+              try {
+                fallbackResult = JSON.parse(fallbackText);
+              } catch (e) {
+                fallbackResult = { raw: fallbackText };
+              }
+              const fallbackOk = (fallbackRes.status === 200 || fallbackRes.ok) && (!fallbackResult.errcode || fallbackResult.errcode === 0);
+              if (fallbackOk) {
+                console.log(`✅ 推送到 ${channel.name} 成功（已降级为 Markdown）`);
+                pushResults.channels[channelId] = { success: true, type: 'webhook', name: channel.name, response: fallbackResult, fallback: "markdown" };
+              } else {
+                console.error(`❌ 推送到 ${channel.name} 失败 | status=${response.status} | body=${responseText.slice(0, 500)}`);
+                pushResults.channels[channelId] = { success: false, type: 'webhook', name: channel.name, error: result };
+              }
             }
           } else if (channel.type === 'email' && channel.emailAddress) {
             // 推送到邮箱（TODO: 实现邮箱推送逻辑）
@@ -386,11 +445,51 @@ export const digestWorker = inngest.createFunction(
       if (channelsToPush.size === 0 && settings!.webhookUrl) {
         // 使用旧的全局 webhook 配置
         console.log("=== 使用全局 Webhook 配置（向后兼容）===");
+        // WPS 开放平台卡片格式（与官方示例一致）
         const payload = {
-          msgtype: "markdown",
-          markdown: {
-            text: reportContent
-          }
+          msgtype: "card",
+          card: {
+            config: {
+              shared_card: true,
+              processing_state: "unprocessed",
+            },
+            i18n_items: [
+              {
+                key: "zh-CN",
+                value: {
+                  header: {
+                    title: { tag: "text", text: { type: "plain", content: "每日简报" } },
+                  },
+                  elements: [
+                    { tag: "markdown", content: reportContent },
+                    { tag: "hr" },
+                    {
+                      tag: "action",
+                      layout: "bisected",
+                      actions: [
+                        {
+                          button: {
+                            tag: "button",
+                            text: { content: "🤖 一键提炼核心观点", type: "plain" },
+                            style: "normal",
+                            key: "action_ai_summarize",
+                          },
+                        },
+                        {
+                          button: {
+                            tag: "button",
+                            text: { content: "📝 提取待办事项", type: "plain" },
+                            style: "normal",
+                            key: "action_ai_todo",
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            ],
+          },
         };
         
         const response = await fetch(settings!.webhookUrl, {
@@ -406,15 +505,34 @@ export const digestWorker = inngest.createFunction(
         } catch (e) {
           result = { raw: responseText };
         }
-        const httpOk = response.status === 200 || response.ok;
-        const bodyOk = result && typeof result.errcode === "number" ? result.errcode === 0 : true;
+        let httpOk = response.status === 200 || response.ok;
+        let bodyOk = result && typeof result.errcode === "number" ? result.errcode === 0 : true;
         if (httpOk && bodyOk) {
           console.log("✅ 简报发送到机器人成功！");
           pushResults.channels['legacy-webhook'] = { success: true, type: 'webhook', name: '默认机器人', response: result };
         } else {
-          if (httpOk && !bodyOk) console.error("❌ 发送到机器人失败（接口返回 errcode）:", result);
-          else console.error("❌ 发送到机器人失败:", result);
-          pushResults.channels['legacy-webhook'] = { success: false, type: 'webhook', name: '默认机器人', error: result };
+          console.error("❌ 卡片发送失败，尝试降级为 Markdown 推送...");
+          const markdownPayload = { msgtype: "markdown", markdown: { text: reportContent } };
+          const fallbackRes = await fetch(settings!.webhookUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(markdownPayload),
+          });
+          const fallbackText = await fallbackRes.text();
+          let fallbackResult: any;
+          try {
+            fallbackResult = JSON.parse(fallbackText);
+          } catch (e) {
+            fallbackResult = { raw: fallbackText };
+          }
+          const fallbackOk = (fallbackRes.status === 200 || fallbackRes.ok) && (!fallbackResult.errcode || fallbackResult.errcode === 0);
+          if (fallbackOk) {
+            console.log("✅ 简报发送到机器人成功（已降级为 Markdown）");
+            pushResults.channels['legacy-webhook'] = { success: true, type: 'webhook', name: '默认机器人', response: fallbackResult, fallback: "markdown" };
+          } else {
+            console.error("❌ 发送到机器人失败 | status=", response.status, "| body=", responseText.slice(0, 500));
+            pushResults.channels['legacy-webhook'] = { success: false, type: 'webhook', name: '默认机器人', error: result };
+          }
         }
       }
 
@@ -497,11 +615,51 @@ export const testPushWorker = inngest.createFunction(
       try {
         if (channel.type === 'webhook' && channel.webhookUrl) {
           // 推送到 Webhook
+          // WPS 开放平台卡片格式（与官方示例一致）
           const payload = {
-            msgtype: "markdown",
-            markdown: {
-              text: testMessage
-            }
+            msgtype: "card",
+            card: {
+              config: {
+                shared_card: true,
+                processing_state: "unprocessed",
+              },
+              i18n_items: [
+                {
+                  key: "zh-CN",
+                  value: {
+                    header: {
+                      title: { tag: "text", text: { type: "plain", content: "推送测试" } },
+                    },
+                    elements: [
+                      { tag: "markdown", content: testMessage },
+                      { tag: "hr" },
+                      {
+                        tag: "action",
+                        layout: "bisected",
+                        actions: [
+                          {
+                            button: {
+                              tag: "button",
+                              text: { content: "🤖 一键提炼核心观点", type: "plain" },
+                              style: "normal",
+                              key: "action_ai_summarize",
+                            },
+                          },
+                          {
+                            button: {
+                              tag: "button",
+                              text: { content: "📝 提取待办事项", type: "plain" },
+                              style: "normal",
+                              key: "action_ai_todo",
+                            },
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
           };
           
           const response = await fetch(channel.webhookUrl, {

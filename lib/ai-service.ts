@@ -3,7 +3,8 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { ANALYST_PROMPT, EDITOR_PROMPT, TLDR_PROMPT, CONSOLIDATED_REPORT_PROMPT } from "./ai-prompts";
 import { RawRSSItem } from "./rss-utils";
-import { Settings } from "./redis";
+import { Settings, getSettings } from "./redis";
+import { getAllActiveUsers } from "./auth";
 
 /**
  * 通用的 AI 模型初始化函数
@@ -22,6 +23,35 @@ function getAIModel(settings: Settings) {
       model: openai.chat(settings.openaiModel || "glm-4-flash"),
     };
   }
+}
+
+/**
+ * 随机抓取系统内配置好的有效大模型 API Key 配置
+ */
+export async function getRandomSystemLLMConfig(): Promise<Settings | null> {
+  try {
+    const userIds = await getAllActiveUsers();
+    if (!userIds || userIds.length === 0) return null;
+    
+    // 打乱用户顺序，实现随机抓取
+    const shuffledIds = [...userIds].sort(() => Math.random() - 0.5);
+    
+    for (const uid of shuffledIds) {
+      const settings = await getSettings(uid);
+      if (!settings) continue;
+      
+      // 检查是否有有效的配置
+      if (settings.aiProvider === 'google' && settings.geminiApiKey) {
+        return settings;
+      }
+      if (settings.aiProvider === 'openai' && settings.openaiApiKey) {
+        return settings;
+      }
+    }
+  } catch (e) {
+    console.error("Error getting random system LLM config:", e);
+  }
+  return null;
 }
 
 /** 是否为内容安全/敏感内容类错误（不重试，直接降级） */
