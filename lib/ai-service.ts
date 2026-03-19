@@ -108,7 +108,7 @@ export async function analyzeItem(item: RawRSSItem, settings: Settings) {
     const hasValidContent = result.summary && result.summary.length > 3 && !result.summary.includes("内容不足");
     
     return { 
-      title: result.title || item.title,
+      title: result.chineseTitle || result.title || item.title,
       summary: hasValidContent ? result.summary : item.title,
       category: result.category || "Other",
       score: hasValidContent ? (result.score || 3) : 3,
@@ -166,30 +166,21 @@ export async function writeCategorySection(category: string, items: any[], setti
 
 /**
  * 聚合报告：将整批资讯聚成 3～6 个主题段，每段有标题和展开内容，每条内容后附链接
- * 返回 sections 供简报组装使用（与原先按分类的 sections 结构一致）
+ * 返回 sections 供简报组装使用（JSON 格式）
  */
 export async function generateConsolidatedReport(
   items: { title: string; summary: string; link: string; category?: string }[],
   settings: Settings
-): Promise<{ sections: { category: string; content: string }[] }> {
+): Promise<{ sections: any[]; markdownReport: string }> {
   const validItems = items.filter((i) => i.link && (i.summary || i.title));
   if (validItems.length === 0) {
-    return { sections: [] };
+    return { sections: [], markdownReport: "" };
   }
 
   const { model } = getAIModel(settings);
   const inputList = validItems
-    .map((i) => `- **${i.title}**：${i.summary || ""} 链接：${i.link}`)
+    .map((i) => `- [${i.category || "综合洞察"}] **${i.title}**：${i.summary || ""} 链接：${i.link}`)
     .join("\n");
-
-  const fallbackSections = [
-    {
-      category: "今日动态",
-      content: validItems
-        .map((i) => `- **${i.title}** ${(i.summary || "").slice(0, 80)} [链接](${i.link})`)
-        .join("\n"),
-    },
-  ];
 
   try {
     const { text } = await withRetry(() =>
@@ -201,27 +192,23 @@ export async function generateConsolidatedReport(
     );
 
     const raw = (text || "").trim();
-    if (!raw) return { sections: fallbackSections };
+    if (!raw) return { sections: [], markdownReport: "" };
 
-    // 解析 ### 小标题 + 段落，拆成 sections
-    const blocks = raw.split(/\n(?=###\s+)/).filter(Boolean);
-    const sections: { category: string; content: string }[] = [];
-
-    for (const block of blocks) {
-      const firstLineEnd = block.indexOf("\n");
-      let title = firstLineEnd >= 0 ? block.slice(0, firstLineEnd) : block;
-      let content = firstLineEnd >= 0 ? block.slice(firstLineEnd + 1) : "";
-      title = title.replace(/^###\s*/, "").trim();
-      content = content.trim();
-      if (title) sections.push({ category: title, content });
+    // AI 现在被要求输出 Markdown 而不是 JSON，直接保存原始文本
+    // 兼容旧逻辑：如果碰巧返回了 JSON 数组也解析
+    const jsonMatch = raw.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      try {
+        const sections = JSON.parse(jsonMatch[0]);
+        return { sections, markdownReport: raw };
+      } catch (_) {}
     }
 
-    if (sections.length > 0) return { sections };
-    return { sections: [{ category: "今日动态", content: raw }] };
+    return { sections: [], markdownReport: raw };
   } catch (e: any) {
     if (isContentSafetyError(e)) {
-      console.warn("[generateConsolidatedReport] 内容安全拦截，使用降级列表", e?.message);
-      return { sections: fallbackSections };
+      console.warn("[generateConsolidatedReport] 内容安全拦截", e?.message);
+      return { sections: [], markdownReport: "" };
     }
     throw e;
   }
@@ -291,7 +278,7 @@ export async function shortenContent(content: string, settings: Settings, target
 /**
  * 廉价模型预筛选：从海量标题中选出最值得分析的条目，并进行语义去重
  */
-export async function filterTopItems(items: any[], settings: Settings, limit = 20) {
+export async function filterTopItems(items: any[], settings: Settings, limit = 20, weights?: Record<string, number>) {
   if (items.length <= limit) return items;
 
   // 使用指定的廉价模型和独立 API Key 进行预筛选，降低成本
@@ -301,6 +288,17 @@ export async function filterTopItems(items: any[], settings: Settings, limit = 2
   });
   const model = cheapOpenAI.chat("glm-4-flash-250414");
   
+  let weightsPrompt = "";
+  if (weights && Object.keys(weights).length > 0) {
+    const preferences = Object.entries(weights)
+      .filter(([_, w]) => w !== 0)
+      .map(([cat, w]) => `${cat}: ${w > 0 ? "偏好" : "不感兴趣"} (权重 ${w})`)
+      .join(", ");
+    if (preferences) {
+      weightsPrompt = `\n    4. 个性化偏好：用户的历史偏好权重如下：[${preferences}]。权重为正的主题请优先保留，权重为负的主题请尽量剔除。`;
+    }
+  }
+
   const prompt = `
     你是一位资深情报编辑。以下是从多个 RSS 源抓取到的 ${items.length} 条新闻标题。
     请根据新闻的重要性、时效性和行业关联度，选出最值得深度分析的 ${limit} 条新闻。
@@ -308,7 +306,7 @@ export async function filterTopItems(items: any[], settings: Settings, limit = 2
     筛选规则：
     1. 语义去重：对于同一个热点事件或高度重复的信息，请只保留一条最完整、最具代表性的标题。
     2. 质量优先：剔除软文、广告、无实质内容的短讯。
-    ${settings.superSubKeyword ? `3. 关注重点：用户目前最关注的主题是“${settings.superSubKeyword}”，请务必优先保留相关内容。` : ''}
+    ${settings.superSubKeyword ? `3. 关注重点：用户目前最关注的主题是“${settings.superSubKeyword}”，请务必优先保留相关内容。` : ''}${weightsPrompt}
 
     待筛选列表：
     ${items.map((item, idx) => `[ID:${idx}] ${item.title}`).join("\n")}

@@ -8,16 +8,16 @@ import {
   Sparkles, Cpu, Newspaper, Book, Gamepad2, LineChart, 
   Clock, CheckCircle2, Plus, User, LogOut, Settings2, 
   Heart, Zap, LayoutGrid, Bell, ArrowRight, Loader2, Rss,
-  Palette, Bitcoin, Code2, Activity, BrainCircuit, Search, X, Globe, AlertCircle, Trash2
+  Palette, Bitcoin, Code2, Activity, BrainCircuit, Search, X, Globe, AlertCircle, Trash2, RotateCcw
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchCurrentConfig, persistSettings, persistRSS, triggerDigest } from "../config/actions";
 import { pushToAdminBot } from "../config/admin-actions";
-import { ANALYST_PROMPT, EDITOR_PROMPT, TLDR_PROMPT } from "../../lib/ai-prompts";
+import { ANALYST_PROMPT, CONSOLIDATED_REPORT_PROMPT, TLDR_PROMPT } from "../../lib/ai-prompts";
 
 // 用于界面展示的默认提示词（未自定义时显示，用户可查看或修改）
 const DEFAULT_ANALYST_DISPLAY = ANALYST_PROMPT.trim();
-const DEFAULT_EDITOR_DISPLAY = EDITOR_PROMPT("类别", 10).trim();
+const DEFAULT_EDITOR_DISPLAY = CONSOLIDATED_REPORT_PROMPT(10).trim();
 const DEFAULT_TLDR_DISPLAY = TLDR_PROMPT.trim();
 
 // 类型定义
@@ -373,6 +373,15 @@ const ThemePreview = ({ theme }: { theme: Theme }) => {
 
 function DashboardContent() {
   const router = useRouter();
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-transparent"><Loader2 className="w-12 h-12 animate-spin text-white" /></div>}>
+      <DashboardInner />
+    </Suspense>
+  );
+}
+
+function DashboardInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [username, setUsername] = useState("");
@@ -436,21 +445,24 @@ function DashboardContent() {
   const [newRssUrlForTheme, setNewRssUrlForTheme] = useState("");
 
   // 立即发送简报：运行状态与轮询；digestSendingFrom 表示当前是哪张卡片在发送（仅该卡显示 loading）
-  const [digestRunStatus, setDigestRunStatus] = useState<{ status: string; progress: number; message?: string } | null>(null);
   const [digestSending, setDigestSending] = useState(false);
   const [digestSendingFrom, setDigestSendingFrom] = useState<string | null>(null);
-  const [digestRunStartAt, setDigestRunStartAt] = useState<number | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     async function init() {
       try {
-        const response = await fetch("/api/auth/me");
-        const authData = await response.json();
-        if (!authData.authenticated) { router.push("/auth"); return; }
+        // 并行发起 auth 检查和配置拉取，节省一次串行往返
+        const [authResponse, config] = await Promise.all([
+          fetch("/api/auth/me").then(r => r.json()),
+          fetchCurrentConfig(),
+        ]);
+        if (!isMounted) return;
+        if (!authResponse.authenticated) { router.push("/auth"); return; }
         setAuthenticated(true);
-        setUsername(authData.username);
+        setUsername(authResponse.username);
 
-        const config = await fetchCurrentConfig();
+        if (!isMounted) return;
         // 将 rssSources 数组转换为字符串并合并到 settings 中
         const settingsWithRss = {
           ...(config.settings || {}),
@@ -480,19 +492,21 @@ function DashboardContent() {
         });
 
         // 检查 URL 参数
-        const tabParam = searchParams.get('tab');
-        if (tabParam === 'active') {
-          setActiveTab('active');
+        const tab = searchParams.get('tab');
+        if (tab === 'active' || tab === 'shelf' || tab === 'settings') {
+          setActiveTab(tab as any);
         }
 
       } catch (e) {
-        router.push("/auth");
+        console.error("Init failed:", e);
+        if (isMounted) router.push("/auth");
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
     init();
-  }, [router, searchParams]);
+    return () => { isMounted = false; };
+  }, [router]); // 仅依赖 router，避免 searchParams 导致的重复运行
 
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
@@ -975,40 +989,18 @@ function DashboardContent() {
     if (digestSending) return;
     setDigestSending(true);
     setDigestSendingFrom(cardKey ?? null);
-    setDigestRunStartAt(Date.now());
-    setDigestRunStatus({ status: "running", progress: 0, message: "正在提交…" });
     try {
       await triggerDigest(cardRssUrls?.length ? cardRssUrls : undefined, cardKey);
+      // 成功提交后，保持 loading 状态几秒钟作为反馈，然后恢复
+      setTimeout(() => {
+        setDigestSending(false);
+        setDigestSendingFrom(null);
+      }, 3000);
     } catch (e) {
       setDigestSending(false);
       setDigestSendingFrom(null);
-      setDigestRunStartAt(null);
-      setDigestRunStatus({ status: "failed", progress: 0, message: "提交失败" });
-      setTimeout(() => setDigestRunStatus(null), 3000);
-      return;
     }
   };
-
-  useEffect(() => {
-    if (!digestSending || digestRunStatus?.status === "success" || digestRunStatus?.status === "failed") return;
-    const t = setInterval(async () => {
-      try {
-        const res = await fetch("/api/digest-run-status");
-        const data = await res.json();
-        setDigestRunStatus((prev) => {
-          if (data.status === "idle" && prev?.status === "running") return prev;
-          return data;
-        });
-        if (data.status === "success" || data.status === "failed") {
-          setDigestSending(false);
-          setDigestSendingFrom(null);
-          setDigestRunStartAt(null);
-          setTimeout(() => setDigestRunStatus(null), 4000);
-        }
-      } catch (_) {}
-    }, 2000);
-    return () => clearInterval(t);
-  }, [digestSending, digestRunStatus?.status]);
 
 
   const openAddSourceModal = (themeId: string) => {
@@ -1217,6 +1209,7 @@ function DashboardContent() {
           <nav className="hidden md:flex items-center bg-white/10 p-1 rounded-2xl border border-white/10 backdrop-blur-sm">
           <button onClick={() => requestTabSwitch('shelf')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'shelf' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/80 hover:text-white'}`}>主题货架</button>
           <button onClick={() => requestTabSwitch('active')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'active' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/80 hover:text-white'}`}>已订阅</button>
+          {/* <button onClick={() => router.push('/read')} className="px-5 py-2 text-sm font-bold rounded-xl transition-all text-white/80 hover:text-white">我的阅读</button> */}
           <button onClick={() => requestTabSwitch('settings')} className={`px-5 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'settings' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/80 hover:text-white'}`}>配置中心</button>
           </nav>
           <div className="h-8 w-px bg-white/10 mx-2" />
@@ -1810,7 +1803,7 @@ function DashboardContent() {
               <h2 className="text-5xl font-black tracking-tight font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200/60">已订阅主题</h2>
 
               {subscribedThemeIds.length > 0 || (settings.rssUrls && settings.rssUrls.trim()) || settings.superSubKeyword ? (
-                <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
                   {/* 已订阅主题卡片 */}
                   {subscribedThemeIds.map((themeId) => {
                     const theme = PRESET_THEMES.find(t => t.id === themeId);
@@ -1821,7 +1814,7 @@ function DashboardContent() {
                     return (
                       <div 
                         key={themeId}
-                        className="break-inside-avoid group relative flex flex-col"
+                        className="relative flex flex-col"
                       >
                         <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-blue-500/20 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5 overflow-hidden">
                           {/* 左上角绿色微光表示已订阅 */}
@@ -1971,7 +1964,7 @@ function DashboardContent() {
                   
                   {/* 超级订阅关键词卡片 */}
                   {settings.superSubKeyword && (
-                    <div className="break-inside-avoid relative flex flex-col">
+                    <div className="relative flex flex-col">
                       <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-blue-500/20 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5">
                         {/* 已订阅标签 + 取消订阅 */}
                         <div className="absolute top-6 right-6 flex items-center gap-2">
@@ -2036,7 +2029,7 @@ function DashboardContent() {
                     if (customRssSources.length === 0) return null;
                     
                     return (
-                      <div className="break-inside-avoid relative flex flex-col">
+                      <div className="relative flex flex-col">
                         <div className="relative bg-white/5 rounded-[40px] p-8 shadow-2xl border border-white/10 hover:border-white/30 hover:-translate-y-2 transition-all duration-500 backdrop-blur-md ring-1 ring-white/5">
                             <div className="flex items-start justify-between mb-8 gap-2">
                               <div className="flex items-center gap-3">
@@ -2243,15 +2236,19 @@ function DashboardContent() {
                           <button type="button" onClick={() => setPromptTab('tldr')} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${promptTab === 'tldr' ? 'bg-white text-blue-950 shadow-lg' : 'text-white/40 hover:text-white'}`}>今日焦点</button>
                         </div>
                         <div className="animate-in fade-in duration-500">
-                          {promptTab === 'analyst' && (
-                            <p className="text-xs text-white/50 mb-2">分析阶段：AI 对每条抓取的新闻进行解析与分类，提炼核心内容、打标签并评分，输出结构化结果供后续汇总使用。</p>
-                          )}
-                          {promptTab === 'editor' && (
-                            <p className="text-xs text-white/50 mb-2">汇总阶段：AI 根据已分类的多条新闻，按主题或赛道分组撰写「今日动态」，生成带链接的 Markdown 简报正文。</p>
-                          )}
-                          {promptTab === 'tldr' && (
-                            <p className="text-xs text-white/50 mb-2">今日焦点：AI 从当日全部动态中提炼最值得关注的 1～3 件事，用简短「今日焦点」呈现，便于快速浏览。</p>
-                          )}
+                          <div className="flex justify-end mb-2">
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                if (promptTab === 'analyst') setSettings({...settings, analystPrompt: DEFAULT_ANALYST_DISPLAY});
+                                else if (promptTab === 'editor') setSettings({...settings, editorPrompt: DEFAULT_EDITOR_DISPLAY});
+                                else setSettings({...settings, tldrPrompt: DEFAULT_TLDR_DISPLAY});
+                              }}
+                              className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
+                            >
+                              <RotateCcw className="w-3 h-3" /> 恢复默认提示词
+                            </button>
+                          </div>
                           <textarea 
                             name={promptTab === 'analyst' ? 'analystPrompt' : promptTab === 'editor' ? 'editorPrompt' : 'tldrPrompt'} 
                             rows={12} 
@@ -2261,9 +2258,99 @@ function DashboardContent() {
                               else if (promptTab === 'editor') setSettings({...settings, editorPrompt: e.target.value});
                               else setSettings({...settings, tldrPrompt: e.target.value});
                             }} 
-                            placeholder=""
-                            className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-sm font-sans focus:ring-2 focus:ring-blue-400 outline-none transition-all resize-none text-white placeholder:text-white/30" 
+                            placeholder={promptTab === 'analyst' ? DEFAULT_ANALYST_DISPLAY : promptTab === 'editor' ? DEFAULT_EDITOR_DISPLAY : DEFAULT_TLDR_DISPLAY}
+                            className="w-full bg-white/5 border border-white/5 rounded-2xl p-5 text-sm font-sans focus:ring-2 focus:ring-blue-400 outline-none transition-all resize-none text-white placeholder:text-white/30 mb-6" 
                           />
+
+                          {/* AI 处理流程与真实图例 */}
+                          <div className="bg-black/20 border border-white/5 rounded-2xl overflow-hidden">
+                            {/* 顶部说明条 */}
+                            <div className="bg-white/5 px-4 py-3 border-b border-white/5 flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div>
+                              <span className="text-xs font-bold text-white/70 tracking-wider">
+                                {promptTab === 'analyst' && "分析阶段：单条新闻结构化提取 + 中文标题生成"}
+                                {promptTab === 'editor' && "聚合阶段：多条新闻归纳为有态度的主题段落"}
+                                {promptTab === 'tldr' && "今日焦点：全局核心提炼"}
+                              </span>
+                            </div>
+
+                            {/* 真实图例对比区域 */}
+                            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                              
+                              {/* 左侧：输入示例 */}
+                              <div className="space-y-3">
+                                <div className="text-[10px] font-black text-white/40 uppercase tracking-widest flex items-center gap-1">
+                                  <span className="text-blue-400">📥</span> 原始输入 (系统传入)
+                                </div>
+                                <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-xs text-white/60 font-mono min-h-[160px]">
+                                  {promptTab === 'analyst' && (
+                                    <div className="space-y-2">
+                                      <p><span className="text-white/30">标题:</span> OpenAI 发布 GPT-4o，免费向所有用户开放</p>
+                                      <p><span className="text-white/30">来源:</span> 机器之心</p>
+                                      <p><span className="text-white/30">内容:</span> 今日凌晨，OpenAI 举办了春季发布会，推出了全新的旗舰模型 GPT-4o。新模型不仅速度更快，而且在文本、语音和视觉能力上实现了原生多模态融合。更重磅的是，GPT-4o 将免费提供给所有 ChatGPT 用户使用...</p>
+                                    </div>
+                                  )}
+                                  {promptTab === 'editor' && (
+                                    <div className="space-y-2 text-blue-200/50 break-all">
+                                      <p className="text-white/30 text-[10px] mb-1">系统将所有 AI 分析结果汇总后传入：</p>
+                                      <p>{`- [🔥 AI 热点] **OpenAI 发布免费多模态旗舰模型 GPT-4o**：推出原生多模态模型… 链接：https://…`}</p>
+                                      <p>{`- [🔥 AI 热点] **Google Gemini 1.5 Pro 上下文升至200万**：谷歌宣布… 链接：https://…`}</p>
+                                      <p>{`- [🍎 硬件动态] **苹果 M4 芯片发布**：专为 AI 优化… 链接：https://…`}</p>
+                                    </div>
+                                  )}
+                                  {promptTab === 'tldr' && (
+                                    <div className="space-y-2 text-white/50">
+                                      <p>系统将今日所有高价值资讯的标题和摘要汇总后传入，要求提炼出最震撼或最重要的 1-3 件事。</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* 右侧：输出示例 */}
+                              <div className="space-y-3">
+                                <div className="text-[10px] font-black text-white/40 uppercase tracking-widest flex items-center gap-1">
+                                  <span className="text-green-400">📤</span> AI 输出结果 (预期效果)
+                                </div>
+                                <div className="bg-blue-950/30 border border-blue-500/20 rounded-xl p-4 text-xs text-blue-100 min-h-[160px] relative group overflow-x-auto custom-scrollbar">
+                                  {promptTab === 'analyst' && (
+                                    <pre className="font-mono text-[11px] leading-relaxed text-green-300/80 whitespace-pre-wrap">
+{`{
+  "chineseTitle": "OpenAI 发布免费多模态旗舰模型 GPT-4o",
+  "summary": "OpenAI 推出原生多模态模型 GPT-4o，实现文本、语音、视觉融合，并向免费用户开放。",
+  "category": "🔥 AI 热点",
+  "score": 9
+}`}
+                                    </pre>
+                                  )}
+                                  {promptTab === 'editor' && (
+                                    <div className="space-y-3 font-sans">
+                                      <h4 className="font-bold text-white text-sm">### 🤖 大模型又卷起来了</h4>
+                                      <p className="text-white/80 text-sm leading-relaxed">OpenAI 今天直接甩出 GPT-4o，原生多模态、免费用，这波属于降维打击。Google 那边也没闲着，Gemini 1.5 Pro 直接把上下文拉到 200 万 token，卷到天际。看来这场 AI 军备竞赛，观众才是最大赢家。 <a href="#" className="text-blue-400 hover:underline">[详情]</a></p>
+                                      <h4 className="font-bold text-white text-sm mt-4">### 🍎 硬件圈也不甘寂寞</h4>
+                                      <p className="text-white/80 text-sm leading-relaxed">苹果悄咪咪把 M4 芯片塞进了新 iPad Pro，16 核 NPU 专门给 AI 留的位置。Tim Cook 虽然嘴上不说，但身体很诚实。</p>
+                                    </div>
+                                  )}
+                                  {promptTab === 'tldr' && (
+                                    <div className="font-sans space-y-3">
+                                      <h4 className="font-bold text-yellow-400 text-sm flex items-center gap-1">
+                                        <span>🌟</span> 今日焦点
+                                      </h4>
+                                      <p className="text-white/90 leading-relaxed text-sm">
+                                        今日 AI 领域迎来神仙打架：OpenAI 突袭发布免费多模态模型 GPT-4o 震撼全场；随后 Google 在 I/O 大会上以 200 万上下文的 Gemini 1.5 Pro 予以反击。
+                                      </p>
+                                    </div>
+                                  )}
+                                  
+                                  {/* 提示遮罩 */}
+                                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <span className="bg-blue-500/20 text-blue-300 text-[9px] px-2 py-1 rounded backdrop-blur-md border border-blue-500/30">
+                                      {promptTab === 'analyst' ? '必须严格输出 JSON' : '支持 Markdown 格式'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                       {dirtyPrompts && (
@@ -2373,38 +2460,6 @@ function DashboardContent() {
           )}
         </AnimatePresence>
 
-        {/* 立即发送进度条 - 右下角 */}
-        <AnimatePresence>
-          {digestRunStatus != null && (
-            <motion.div
-              initial={{ opacity: 0, x: 24 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 24 }}
-              className="fixed bottom-8 right-8 z-[180] w-full max-w-sm px-5 py-4 bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl"
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  setDigestRunStatus(null);
-                  setDigestSending(false);
-                  setDigestSendingFrom(null);
-                  setDigestRunStartAt(null);
-                }}
-                className="absolute top-3 right-3 p-1 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-                aria-label="关闭"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              <div className="pr-8">
-                <span className="text-sm font-bold text-white">
-                  {digestRunStatus.status === "running" && "简报生成中，预计需要 3～5 分钟，请稍候。"}
-                  {digestRunStatus.status === "success" && "✅ 简报生成完成"}
-                  {digestRunStatus.status === "failed" && `❌ ${digestRunStatus.message || "失败"}`}
-                </span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Toast 提示 */}
         <AnimatePresence>
@@ -2428,9 +2483,5 @@ function DashboardContent() {
 }
 
 export default function Dashboard() {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-transparent"><Loader2 className="w-12 h-12 animate-spin text-white" /></div>}>
-      <DashboardContent />
-    </Suspense>
-  );
+  return <DashboardContent />;
 }

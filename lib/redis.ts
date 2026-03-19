@@ -170,6 +170,12 @@ export async function deletePushChannel(userId: string, channelId: string) {
   await savePushChannels(userId, filtered);
 }
 
+export async function getUserCategoryWeights(userId: string): Promise<Record<string, number>> {
+  if (!globalKv) return {};
+  const weightsKey = `user:${userId}:category_weights`;
+  return await globalKv.hgetall<Record<string, number>>(weightsKey) || {};
+}
+
 /**
  * 动态创建 KV 客户端，用于测试
  */
@@ -201,10 +207,6 @@ function getUserSettingsKey(userId: string): string {
 
 function getUserRSSKey(userId: string): string {
   return `user:${userId}:rss_sources`;
-}
-
-function getDigestRunStatusKey(userId: string): string {
-  return `user:${userId}:digest_run_status`;
 }
 
 function getUserRawRSSKey(userId: string): string {
@@ -265,23 +267,6 @@ export async function saveRSSSources(userId: string, sources: string[]) {
 }
 
 /** 简报手动运行状态（用于前端进度条） */
-export interface DigestRunStatus {
-  status: "idle" | "running" | "success" | "failed";
-  progress: number; // 0-100
-  message?: string;
-  finishedAt?: string;
-}
-
-export async function getDigestRunStatus(userId: string): Promise<DigestRunStatus | null> {
-  if (!globalKv) return null;
-  const v = await globalKv.get<DigestRunStatus>(getDigestRunStatusKey(userId));
-  return v || null;
-}
-
-export async function setDigestRunStatus(userId: string, data: DigestRunStatus): Promise<void> {
-  if (!globalKv) return;
-  await globalKv.set(getDigestRunStatusKey(userId), data);
-}
 
 /**
  * 保存原始 RSS 条目（26 小时窗口，去重由抓取逻辑保障）
@@ -359,6 +344,7 @@ export interface PushLog {
       category?: string;
       score?: number;
     }>;
+    sections?: any[];
   };
   reportContent?: string;
   details?: {
@@ -368,6 +354,9 @@ export interface PushLog {
     successCount?: number;
     partCount?: number;
     pushPending?: boolean;
+    totalArticles?: number;
+    filteredNoise?: number;
+    insightCount?: number;
   };
 }
 
@@ -379,21 +368,50 @@ export async function savePushLog(userId: string, log: Omit<PushLog, 'id' | 'tim
   const key = `user:${userId}:push_logs`;
   const newLog: PushLog = {
     ...log,
-    id: `log_${Date.now()}`,
+    // 将 userId 编码进 logId 中，方便 H5 独立页通过 id 反查
+    id: `log_${Date.now()}_${userId}`,
     timestamp: new Date().toISOString(),
   };
   
   // 使用 lpush 和 ltrim 保留最近 50 条记录
   await globalKv.lpush(key, JSON.stringify(newLog));
   await globalKv.ltrim(key, 0, 49);
+  
+  // 同时存储一个直接可以通过 ID 访问的独立副本（保留 7 天），方便 H5 访问
+  await globalKv.set(`digest:${newLog.id}`, JSON.stringify(newLog), { ex: 7 * 24 * 60 * 60 });
+  
+  return newLog.id;
+}
+
+/**
+ * 根据简报 ID 获取推送日志 (供 H5 独立页使用)
+ */
+export async function getPushLogById(logId: string): Promise<PushLog | null> {
+  if (!globalKv) return null;
+  // 优先从独立副本获取
+  const logStr = await globalKv.get<string>(`digest:${logId}`);
+  if (logStr) {
+    return typeof logStr === 'string' ? JSON.parse(logStr) : logStr;
+  }
+
+  // 兜底：如果独立副本过期或不存在，尝试从 logId 解析出 userId 并到其列表中查找
+  const parts = logId.split('_');
+  if (parts.length >= 3) {
+    const userId = parts.slice(2).join('_');
+    const logs = await getPushLogs(userId);
+    return logs.find(l => l.id === logId) || null;
+  }
+  return null;
 }
 
 /**
  * 获取用户最近的推送日志
+ * @param limit 最多返回几条，默认 20（列表展示）；传 -1 表示全量（慎用）
  */
-export async function getPushLogs(userId: string): Promise<PushLog[]> {
+export async function getPushLogs(userId: string, limit = 20): Promise<PushLog[]> {
   if (!globalKv) return [];
   const key = `user:${userId}:push_logs`;
-  const logs = await globalKv.lrange<string>(key, 0, -1);
-  return logs.map(l => JSON.parse(l));
+  const end = limit === -1 ? -1 : limit - 1;
+  const logs = await globalKv.lrange<string>(key, 0, end);
+  return logs.map(l => (typeof l === 'string' ? JSON.parse(l) : l));
 }

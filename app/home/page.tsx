@@ -435,21 +435,13 @@ export default function Home() {
           {/* 双按钮/单按钮逻辑：根据登录状态切换 */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
             {authenticated ? (
-              <>
-                <button
-                  onClick={() => router.push("/dashboard")}
-                  className="group inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white text-blue-950 rounded-full text-base font-semibold hover:bg-blue-50 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
-                >
-                  进入后台
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                </button>
-                <button
-                  onClick={() => router.push("/config")}
-                  className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-transparent text-white border border-white/30 rounded-full text-base font-medium hover:bg-white/10 transition-all"
-                >
-                  进入配置
-                </button>
-              </>
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="group inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white text-blue-950 rounded-full text-base font-semibold hover:bg-blue-50 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+              >
+                进入后台
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+              </button>
             ) : (
               <button
                 onClick={() => openAuth("login", "/dashboard")}
