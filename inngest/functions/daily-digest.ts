@@ -87,11 +87,6 @@ export const digestWorker = inngest.createFunction(
     const themeId = event.data.themeId as string | undefined;
 
     try {
-      try {
-        await setDigestRunStatus(userId, { status: "running", progress: 0, message: "正在准备…" });
-      } catch (e) {
-        console.warn("setDigestRunStatus failed, ignoring:", e);
-      }
       console.log(`🔄 开始处理用户 ${userId} 的简报...${cardRssUrls?.length ? ` (仅本卡片 ${cardRssUrls.length} 个源)` : ""}`);
 
       const { settings, rssSources, useSuperSub, categoryWeights } = await step.run("get-config", async () => {
@@ -255,26 +250,10 @@ export const digestWorker = inngest.createFunction(
           
           return generateConsolidatedReport(itemsForReport, settings!);
         });
-        try {
-          await setDigestRunStatus(userId, { status: "running", progress: 68 + i * 4, message: "简报内容已就绪，正在准备推送…" });
-        } catch (e) {
-          console.warn("setDigestRunStatus failed, ignoring:", e);
-        }
         batchResults.push({ tldr, sections: sections || [], markdownReport: markdownReport || "", highQualityItems });
       }
-    try {
-      await setDigestRunStatus(userId, { status: "running", progress: 75, message: "正在组装与推送…" });
-    } catch (e) {
-      console.warn("setDigestRunStatus failed, ignoring:", e);
-    }
-
     // Step 1：仅组装内容并写入 KV（不推送），缩短单次请求耗时，多维表可立即拉取
     const assembleResult = await step.run("assemble-and-save", async () => {
-      try {
-        await setDigestRunStatus(userId, { status: "running", progress: 85, message: "生成全局总结" });
-      } catch (e) {
-        console.warn("setDigestRunStatus failed, ignoring:", e);
-      }
       const allHighQualityItems: any[] = [];
       const allSections: any[] = [];
       const allMarkdownReports: string[] = [];
@@ -316,12 +295,6 @@ export const digestWorker = inngest.createFunction(
           insightCount: allSections.length,
         },
       });
-
-      try {
-        await setDigestRunStatus(userId, { status: "running", progress: 90, message: "内容已就绪，即将推送…" });
-      } catch (e) {
-        console.warn("setDigestRunStatus failed, ignoring:", e);
-      }
 
       return {
         logId,
@@ -386,11 +359,6 @@ export const digestWorker = inngest.createFunction(
 
     // Step 3：仅推送（读上一步返回内容），单步只做网络请求，降低超时风险
     const finalReport = await step.run("push-to-channels", async () => {
-      try {
-        await setDigestRunStatus(userId, { status: "running", progress: 92, message: "内容推送中" });
-      } catch (e) {
-        console.warn("setDigestRunStatus failed, ignoring:", e);
-      }
       const { batchResultsLength, logId } = assembleResult;
       const pushResults: any = { channels: {} };
 
@@ -654,17 +622,6 @@ export const digestWorker = inngest.createFunction(
 
       const channelResults = Object.values(pushResults.channels);
       const hasSuccess = channelResults.some((r: any) => r.success);
-      // 注意：我们在组装阶段已经保存了日志，这里可以更新状态，但为了简单，可以只更新 digestRunStatus
-      try {
-        await setDigestRunStatus(userId, {
-          status: hasSuccess ? "success" : "failed",
-          progress: 100,
-          message: hasSuccess ? "简报生成完成" : "推送失败",
-          finishedAt: new Date().toISOString(),
-        });
-      } catch (e) {
-        console.warn("setDigestRunStatus failed, ignoring:", e);
-      }
 
       if (channelResults.length > 0) {
         return { status: hasSuccess ? "sent" : "partial_failed", partCount: batchResultsLength, pushResults };
@@ -674,16 +631,6 @@ export const digestWorker = inngest.createFunction(
 
     return finalReport;
     } catch (err: any) {
-      try {
-        await setDigestRunStatus(userId, {
-          status: "failed",
-          progress: 0,
-          message: err?.message || "运行出错",
-          finishedAt: new Date().toISOString(),
-        });
-      } catch (e) {
-        console.warn("setDigestRunStatus failed, ignoring:", e);
-      }
       throw err;
     }
   }
