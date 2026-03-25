@@ -44,10 +44,12 @@ export const dailyScheduler = inngest.createFunction(
     }
 
     const now = new Date();
-    const currentHour = now.getHours().toString();
-    const currentDay = now.getDay(); // 0-6, 0 是周日
+    const beijingTimeStr = now.toLocaleString("en-US", { timeZone: "Asia/Shanghai" });
+    const beijingDate = new Date(beijingTimeStr);
+    const currentHour = beijingDate.getHours().toString();
+    const currentDay = beijingDate.getDay(); // 0-6, 0 是周日
     
-    console.log(`📢 开始调度 ${userIds.length} 个用户的简报生成任务，当前时间: ${currentHour}:00, 星期: ${currentDay}`);
+    console.log(`📢 开始调度 ${userIds.length} 个用户的简报生成任务，当前时间: ${currentHour}:00 (北京时间), 星期: ${currentDay}`);
 
     let dispatchedCount = 0;
     for (const userId of userIds) {
@@ -56,7 +58,7 @@ export const dailyScheduler = inngest.createFunction(
       });
 
       // 如果用户没设时间（默认 8 点）或者 设定的时间等于当前小时
-      const targetHour = settings?.pushTime || "8";
+      const targetHour = String(settings?.pushTime ?? "8");
       const targetDays = settings?.pushDays || [1, 2, 3, 4, 5]; // 默认工作日
       
       if (targetHour === currentHour && targetDays.includes(currentDay)) {
@@ -267,7 +269,9 @@ export const digestWorker = inngest.createFunction(
       try {
         const allItems = assembleResult.allHighQualityItems || [];
         const now = new Date();
-        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        const beijingTimeStr = now.toLocaleString("en-US", { timeZone: "Asia/Shanghai" });
+        const beijingDate = new Date(beijingTimeStr);
+        const today = `${beijingDate.getFullYear()}-${String(beijingDate.getMonth() + 1).padStart(2, "0")}-${String(beijingDate.getDate()).padStart(2, "0")}`;
 
         // Part 1: AI 聚合报告（有态度的段落式叙述）
         const reportSection = (assembleResult.consolidatedReport || "").trim();
@@ -611,7 +615,7 @@ export const testPushWorker = inngest.createFunction(
     }
 
     // 生成测试消息
-    const testMessage = `# 🧪 推送测试消息\n\n**测试时间**: ${new Date().toLocaleString('zh-CN')}\n**主题**: ${themeId}\n**推送渠道**: ${channel.name}\n\n这是一条测试消息，用于验证推送渠道是否正常工作。\n\n如果您收到这条消息，说明推送配置正确！✅`;
+    const testMessage = `# 🧪 推送测试消息\n\n**测试时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n**主题**: ${themeId}\n**推送渠道**: ${channel.name}\n\n这是一条测试消息，用于验证推送渠道是否正常工作。\n\n如果您收到这条消息，说明推送配置正确！✅`;
 
     const pushResult = await step.run("push-to-channel", async () => {
       try {
