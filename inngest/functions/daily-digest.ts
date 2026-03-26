@@ -79,7 +79,39 @@ export const dailyScheduler = inngest.createFunction(
  * 工作器：处理单个用户的简报生成和推送
  */
 export const digestWorker = inngest.createFunction(
-  { id: "digest-worker", name: "简报生成工作器" },
+  { 
+    id: "digest-worker", 
+    name: "简报生成工作器",
+    onFailure: async ({ error, event, step }) => {
+      const originalEvent = event.data.event;
+      const userId = originalEvent.data.userId;
+      
+      await step.run("notify-failure", async () => {
+        const settings = await getSettings(userId);
+        const webhookUrl = settings?.webhookUrl;
+        
+        if (webhookUrl) {
+          const errorMessage = `⚠️ **Weave 简报生成失败**\n\n**失败原因**: ${error.message}\n\n*这通常是因为 AI 接口并发限制或请求超时导致。系统已尝试多次重试但均未成功，请稍后手动触发或等待下一次定时任务。*`;
+          
+          const payload = {
+            msgtype: "markdown",
+            markdown: { text: errorMessage }
+          };
+
+          try {
+            await fetch(webhookUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            console.log(`✅ 已向用户 ${userId} 发送失败通知`);
+          } catch (fetchErr) {
+            console.error(`❌ 发送失败通知异常:`, fetchErr);
+          }
+        }
+      });
+    }
+  },
   { event: "digest/generate" },
   async ({ event, step }) => {
     const userId = event.data.userId as string;
